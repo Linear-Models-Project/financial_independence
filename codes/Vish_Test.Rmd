@@ -1,0 +1,12 @@
+---
+title: "Vish_Test"
+author: "VG_qtf7du"
+date: "2024-07-25"
+output: html_document
+---
+
+```{r}
+data <- read.csv("C:/Users/vishg/Documents/MSDS/financial_independence/data/reddit_finance.csv")
+
+
+```
