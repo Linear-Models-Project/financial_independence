@@ -6,7 +6,11 @@ output: html_document
 ---
 
 ```{r}
-data <- read.csv("C:/Users/vishg/Documents/MSDS/financial_independence/data/reddit_finance.csv")
-
-
+work_dir <- dirname(getwd())
+work_dir
+filepath <- paste(work_dir, "/data/reddit_finance.csv", sep = "")
+fin_df <- read.csv(filepath)
+head(fin_df, 10)
+dim(fin_df)
+str(fin_df)
 ```

@@ -1,0 +1,31 @@
+---
+title: "Analysis on Financial Independence"
+author: "Afnan, Akaash, Brennan, Isaac, Vishwanath"
+date: "2024-08-09"
+output: html_document
+---
+
+# Analysis of Financial Independence
+
+### Exploratory Data Analysis
+
+```{r}
+### Reading the Database and Exploring it
+
+# Setting the working directory so that we do not have to change the location in each user's laptop
+
+# By default, the current working directory is at the codes folder after getwd(), 
+# so using dirname on the codes dir gets the parent directory i.e. the base folder
+work_dir <- dirname(getwd())
+work_dir
+# Data resides inside the data folder ->
+filepath <- paste(work_dir, "/data/reddit_finance.csv", sep = "")
+
+fin_df <- read.csv(filepath)
+head(fin_df, 10)
+
+dim(fin_df)
+
+str(fin_df)
+
+```
