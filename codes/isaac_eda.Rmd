@@ -1,0 +1,33 @@
+---
+title: "EDA"
+author: "Isaac Levy"
+date: "2024-07-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(MASS)
+library(tidyverse)
+library(nationalparkcolors)
+library(PrettyCols)
+library(corrplot)
+library(ggcorrplot)
+library(car)
+
+pal <- park_palette('Acadia')
+palette <- prettycols('Autumn')
+
+data_dir <- '/Users/isaaclevy/Desktop/MSDS/STAT6021/financial_independence/data'
+```
+
+
+### Initial Plots and Cleaning
+
+```{r}
+df <- read_csv('/Users/isaaclevy/Desktop/MSDS/STAT6021/financial_independence/data/reddit_finance.csv')
+
+
+```
+
