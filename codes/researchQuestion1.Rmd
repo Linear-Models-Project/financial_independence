@@ -1,0 +1,143 @@
+---
+title: "Data Exploration and Research Question"
+author: "Afnan Alabdulwahab"
+date: "2024-07-31"
+output: html_document
+---
+
+```{r}
+#install.packages("DataExplorer")
+# Load the DataExplorer package
+# Install skimr and summarytools
+#install.packages("skimr")
+#install.packages("summarytools")
+
+library(DataExplorer)
+# Load the packages
+library(skimr)
+library(tidyverse)
+```
+
+```{r}
+# Load the dataset
+reddit_data <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/openintro/reddit_finance.csv")
+```
+
+```{r}
+# Inspect unique values in the country column
+unique(reddit_data$country)
+```
+
+```{r}
+# Filter the dataset to include only respondents from the United States
+us_reddit_data <- reddit_data %>% filter(country == "United States")
+
+# View the first few rows of the filtered dataset
+head(us_reddit_data)
+```
+
+```{r}
+# Descriptive statistics for numeric variables
+us_reddit_data %>%
+  select_if(is.numeric) %>%
+  summary()
+```
+
+
+```{r}
+# Inspect unique values in the age column
+unique(us_reddit_data$age)
+```
+
+```{r}
+# Create a bar plot for age distribution
+ggplot(filtered_us_reddit_data, aes(x = age)) +
+  geom_bar(fill = "blue", color = "black") +
+  labs(title = "Age Distribution of Respondents in the United States", x = "Age Range", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+```{r}
+# Create a bar plot for gender distribution
+ggplot(us_reddit_data, aes(x = gender)) +
+  geom_bar(fill = "purple", color = "black", na.rm = TRUE) +
+  labs(title = "Distribution of Gender", x = "Gender", y = "Count")
+```
+
+```{r}
+# Create a bar plot for education distribution
+ggplot(us_reddit_data, aes(x = edu)) +
+  geom_bar(fill = "orange", color = "black", na.rm = TRUE) +
+  labs(title = "Distribution of Education Level", x = "Education Level", y = "Count")
+```
+
+
+```{r}
+# Create a data profiling report
+create_report(us_reddit_data)
+```
+```{r}
+# Using skimr
+skim(us_reddit_data)
+```
+
+
+I think this question might work for categorical predictions since age (age group) and education level are categorical
+## Research Question 1: 
+**Research Question:** How do age, education level, and number of incomes influence the Financial Independence (FI) number among American respondents?
+
+**Response Variable:**
+- `fin_indy_num`: The amount at which respondents consider themselves financially independent.
+
+**Predictors:**
+1. **Age**: Convert age ranges to numeric values (as midpoint values).
+2. **Education Level**: Encode education levels as numeric or factor variables.
+3. **Number of Incomes**: The number of individuals contributing to the household income (`num_incomes`).
+
+```{r}
+# Load the dataset
+reddit_data <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/openintro/reddit_finance.csv")
+
+# Filter the dataset to include only respondents from the United States
+us_reddit_data <- reddit_data %>% filter(country == "United States")
+```
+
+
+```{r}
+# Filter out rows with missing values in the relevant columns
+cleaned_data <- us_reddit_data %>%
+  filter(age != "N/A" & age != "" & !is.na(fin_indy_num) & !is.na(num_incomes) & !is.na(edu)) %>%
+  mutate(
+    age_factor = factor(age),                # Convert age to factor
+    edu_factor = factor(edu, levels = unique(edu))  # Convert education to factor
+  )
+cleaned_data
+```
+
+
+```{r}
+# Select relevant columns
+model_data <- cleaned_data %>% dplyr::select(fin_indy_num, age_factor, num_incomes, edu_factor)
+```
+
+```{r}
+# View summary of the data
+summary(model_data)
+```
+
+```{r}
+# Visualize relationships between predictors and response variable
+ggplot(model_data, aes(x = age_factor, y = fin_indy_num)) + 
+  geom_boxplot() + 
+  labs(title = "Financial Independence Number vs Age", x = "Age Range", y = "FI Number")
+
+ggplot(model_data, aes(x = num_incomes, y = fin_indy_num)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  labs(title = "Financial Independence Number vs Number of Incomes", x = "Number of Incomes", y = "FI Number")
+
+ggplot(model_data, aes(x = edu_factor, y = fin_indy_num)) + 
+  geom_boxplot() + 
+  labs(title = "Financial Independence Number vs Education Level", x = "Education Level", y = "FI Number")
+```
+
