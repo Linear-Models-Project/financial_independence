@@ -4,6 +4,14 @@ author: "VG_qtf7du"
 date: "2024-07-25"
 output: html_document
 ---
+```{r}
+library(tidyverse)
+```
+```{r}
+#library(dataMaid)
+#makeDataReport(fin_df,output = "html", replace = T)
+```
+
 
 ```{r}
 work_dir <- dirname(getwd())
@@ -11,6 +19,112 @@ work_dir
 filepath <- paste(work_dir, "/data/reddit_finance.csv", sep = "")
 fin_df <- read.csv(filepath)
 head(fin_df, 10)
-dim(fin_df)
-str(fin_df)
+
+fin_df <- filter(fin_df, country == "United States")
+nrow(fin_df)
 ```
+```{r}
+fin_df <- fin_df %>% mutate(fin_indy_inst_amount = coalesce(fin_indy_num, 0) + coalesce(whn_fin_indy_num, 0))
+fin_df
+```
+
+```{r}
+numeric_columns <- fin_df %>%
+  select(where(is.numeric)
+         ) %>%
+  names()
+numeric_columns
+
+fin_df <- fin_df %>%
+  mutate(across(all_of(numeric_columns), as.numeric))
+```
+```{r}
+fin_df[is.na(fin_df)] <- 0
+```
+
+```{r}
+#model1 <- lm(fin_indy_num~tgt_sf_wthdrw_rt+home_value+invst_accts+student_loans+medical_debt+
+ #              X2020_housing_exp+X2020_lux_exp+X2020_charity+X2020_other_exp+max_retire_sup+brokerage_accts_tax+
+  #             spec_crypto, fin_df)
+model1 <- lm(fin_indy_inst_amount~.-fin_indy_num-whn_fin_indy_num-rownames, select(fin_df, numeric_columns))
+
+aicm <- MASS::stepAIC(model1, direction = "both")
+summary(aicm)
+```
+```{r}
+round(cor(select(fin_df,numeric_columns)),2)
+```
+
+
+```{r}
+library(ggcorrplot)
+ggcorrplot(cor(select(fin_df,numeric_columns)), type="upper")
+```
+
+```{r}
+ggplot(fin_df, aes(whn_fin_indy_num)) +
+  geom_histogram(na.rm = TRUE, bins = 20) +
+  labs(
+    title = "At what amount invested did you consider\nyourself Financially Independent?",
+    x = "Dollar Amount (in local currency)",
+    y = "Number of Respondents"
+  )
+```
+```{r}
+ggplot(fin_df, aes(retire_age)) +
+  geom_bar(na.rm = TRUE) +
+  labs(
+    title = "At what age do you expect to retire?",
+    x = "Age Bracket",
+    y = "Number of Respondents"
+  )
+```
+```{r}
+fin_df %>%
+  ggplot(
+    aes(x = fin_indy_num, y = retire_exp )
+  )+
+  geom_jitter()
+#+ scale_x_log10() + scale_y_log10()
+```
+
+```{r}
+fin_df %>%
+  ggplot(
+    aes(x=fin_indy_inst_amount, y = fin_indy_num)
+  )+
+  geom_jitter()+
+  scale_y_sqrt()+
+  scale_x_sqrt()
+```
+
+```{r}
+df_long <- fin_df %>%
+  select(numeric_columns) %>%
+  pivot_longer(-fin_indy_inst_amount,names_to = "variable", values_to = "value")
+df_long
+```
+
+
+
+```{r}
+df_long %>%
+  ggplot( aes(x = value, y = fin_indy_inst_amount)) +  # Use 'id' as y-axis
+  geom_jitter() +  # or any other geom function
+  facet_wrap(~variable) +
+  labs(x = "Value", y = "ID", title = "Faceted Plot by Variable") +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
