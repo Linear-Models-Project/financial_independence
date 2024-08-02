@@ -1,0 +1,31 @@
+---
+title: "PracticeFile"
+format: revealjs
+editor: visual
+---
+
+## Predicting Financial Independence
+
+The data used in this investigation are official results of a 2020 FI Survey from Reddit (r/FinancialIndependence).
+
+We explore key
+
+## Exploring the Data and Variables
+
+When you click the **Render** button a document will be generated that includes:
+
+-   Content authored with markdown
+-   Output from executable code
+-   
+
+## Code
+
+When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+## Predicting Financial Independence
+
+Our project
