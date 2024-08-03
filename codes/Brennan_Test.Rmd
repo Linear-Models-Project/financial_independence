@@ -1,0 +1,89 @@
+---
+title: "Brennan_Test"
+author: "Brennan Thompson"
+date: "2024-08-03"
+output: html_document
+---
+```{r}
+df <- read.csv("C:/Users/Brennan Thompson/Documents/STAT6021/financial_independence/data/reddit_finance.csv")
+```
+```{r}
+df
+```
+
+
+```{r}
+# Question 1 for Multiple Regression:
+# PREDICTORS:
+# number of incomes, 'num_incomes'
+# age, "age"
+# relationship status, "rel_status"
+# children, "children"
+# percentage of financial independence achieved, "fin_indy_pct", 
+# stop working when independent, "stp_whn_fin_indy",
+# safe withdrawal rate, "tgt_sf_wthdrw_rt", 
+# Home value, "home_value",
+# Brokerage Accounts (taxable), "brokerage_accts_tax"
+# student_loans
+# mortgage,
+# auto_loan,
+# credit_personal_loan,
+# medical_debt,
+# invst_prop_bus_own_debt,
+# other_debt,
+# 2020_gross_inc,
+# 2020_housing_exp,
+# 2020_utilities_exp,
+# 2020_transp_exp,
+# 2020_necessities_exp
+# 2020_lux_exp
+# 
+# 2020_child_exp
+# 
+# 2020_debt_repay
+# 
+# 2020_invst_save
+# 
+# 2020_charity
+# 
+# 2020_healthcare_exp
+# 
+# 2020_taxes
+# 
+# 2020_edu_exp
+# 
+# 2020_other_exp
+# OUTPUT VAR:
+# influence the Financial Independence (FI) number among American respondents? (AFNAN), 'fin_indy_num' and 'whn_fin_indy_num'
+```
+
+```{r}
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+# Question 2:
+#retirement investment amount, "retire_invst_num"
+```
+
