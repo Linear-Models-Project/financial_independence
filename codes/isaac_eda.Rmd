@@ -15,19 +15,67 @@ library(PrettyCols)
 library(corrplot)
 library(ggcorrplot)
 library(car)
+library(openintro)
 
-pal <- park_palette('Acadia')
+acadia <- park_palette('Acadia')
 palette <- prettycols('Autumn')
 
-data_dir <- '/Users/isaaclevy/Desktop/MSDS/STAT6021/financial_independence/data'
 ```
 
 
 ### Initial Plots and Cleaning
 
 ```{r}
-df <- read_csv('/Users/isaaclevy/Desktop/MSDS/STAT6021/financial_independence/data/reddit_finance.csv')
+data("reddit_finance")
+
+df <- reddit_finance
+
+us.only <- df[df$country == 'United States',]
+
+```
+
+```{r}
+mod.0 <- lm(cash~pan_inc_chg+fin_indy+retirement_accts_tax, data = us.only)
+summary(mod.0)
+```
+
+```{r}
+df <- us.only %>%
+  select(c(cash, invst_accts, student_loans, retirement_accts_tax, retire_exp,
+           num_incomes, fin_indy_num, retire_invst_num, fin_indy_pct))
+
+df <- df %>%
+  mutate(cash.log = log10(cash), ret.log = log10(retirement_accts_tax))
+
+df <- df[df$cash.log > 0 & df$ret.log > 0,]
+
+mod.0.1 <- lm(cash.log~.-cash-retirement_accts_tax, data = df)
+summary(mod.0.1)
+```
+
+```{r}
+df %>%
+  ggplot() + 
+  aes(x=ret.log, y=cash.log) +
+  geom_jitter() +
+  geom_smooth(method = 'lm', se=T)
+```
 
 
+```{r}
+df %>%
+  ggplot() + 
+  aes(y=log(fin_indy_num), x=log(fin_indy_pct)) +
+  geom_jitter() +
+  geom_smooth(method = 'lm', se=F)
+```
+
+```{r}
+mod.0.2 <- lm(fin_indy_num~num_incomes+retir, data = df)
+summary(mod.0.2)
+```
+
+```{r}
+unique(us.only$housing)
 ```
 

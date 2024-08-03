@@ -1,0 +1,325 @@
+---
+title: "Logistic Regression"
+author: "Isaac Levy"
+date: "2024-08-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(openintro)
+library(nationalparkcolors)
+library(PrettyCols)
+library(MASS)
+library(broom)
+library(caret)
+library(car)
+library(glmnet)
+library(pls)
+library(corrr)
+library(tidyverse)
+
+
+acadia <- park_palette('Acadia')
+autumn <- prettycols('Autumn')
+
+
+```
+
+## Setup and initial cleaning
+
+```{r data setup}
+data('reddit_finance')
+
+df <- reddit_finance[reddit_finance$country == 'United States',]
+
+# remove all columns with more than 50% missing values
+df.2 <- df[, which(colMeans(!is.na(df)) > 0.5)]
+
+```
+
+## Basic EDA
+
+### Transform `housing` variable to 1 for Own 0 for everything else
+
+```{r}
+df.2 <- df.2 %>%
+  mutate(numown = ifelse(housing == 'Own', 1, 0))
+
+# drop all NA rows for this variable
+df.2 <- df.2[!is.na(df.2$housing),]
+
+unique(df.2$numown)
+```
+
+### Counts for 2 statuses
+
+```{r}
+count(df.2, numown, sort=T) # almost 50/50 based on split used above
+```
+
+## Correlations
+
+```{r}
+corrs <- correlate(df.2, method = 'pearson')
+corrs
+```
+```{r}
+corrs$numown # highest correlations are home_value (0.5), retirement_accts_tax (0.31), 2020_necessities_exp (0.33)
+```
+
+## Build a model with everything
+
+```{r}
+df.3 <- df.2 %>%
+  select(c(numown, retirement_accts_tax, home_value, '2020_necessities_exp',
+           num_incomes))
+
+df.3 <- rename(df.3, c('necessities_exp' = '2020_necessities_exp'))
+
+df.4 <- na.omit(df.3)
+```
+
+```{r}
+df.4 %>%
+  ggplot() +
+  aes(x=num_incomes) +
+  geom_histogram(stat = 'count')
+```
+
+
+```{r}
+df.5 <- df.4 %>%
+  mutate(retirement_accts_tax = log(retirement_accts_tax),
+         necessities_exp = log(necessities_exp),
+         home_value = log(home_value))
+
+mod.logged <- glm(numown~retirement_accts_tax + home_value + necessities_exp, data = df.5)
+summary(mod.logged)
+```
+
+```{r}
+mod.0 <- glm(numown~retirement_accts_tax + home_value + necessities_exp + num_incomes, data = df.4)
+summary(mod.0)
+```
+
+
+```{r}
+vif(mod.0)
+```
+
+```{r}
+summary(df.4)
+```
+
+
+```{r}
+pred.1 <- df.4[3:10,]
+prob.1 <- predict(mod.0, pred.1, type = 'response')
+prob.1
+```
+
+```{r}
+df.4[3:10, "numown"]
+```
+
+## Model visualization
+
+```{r}
+ggplot(df.4, aes(x = log(home_value), y = numown)) + 
+  geom_point(aes(color = numown), position = position_jitter(height = 0.03, 
+                                                             width = 0)) +
+  geom_smooth(method = "glm", method.args = list(family="binomial")) +
+  labs(y = "P(Own Home)", 
+       title = "Reddit Finance - Logistic Regression for Home Ownership") +
+  theme_bw() + scale_y_continuous(breaks = seq(0, 1, by = 0.1))
+```
+
+```{r}
+unique(df.6$pan_inc_chg)
+```
+
+
+```{r}
+df.6 <- df.2 %>%
+  select(-c(other_val, spec_crypto, invst_prop_bus_own, '2020_invst_save', 
+            '2020_healthcare_exp', country, housing))
+
+df.nona <- na.omit(df.6)
+
+summary(df.nona)
+```
+
+```{r}
+b_full <- glm(numown ~., data = df.nona, 
+                    family = binomial)
+summary(b_full)
+```
+
+
+```{r}
+b_0 <- glm(numown ~ 1, data = df.nona, family = "binomial")
+summary(b_0)
+```
+
+```{r}
+b_best <- stepAIC(b_0, direction = "both", 
+                  scope = list(upper=b_full, lower=b_0), trace = 0)
+summary(b_best)
+```
+
+```{r}
+mod.1 <- glm(numown ~ gross_inc + taxes + 
+               fin_indy_pct + brokerage_accts_tax + children + home_value,
+             data = df.nona, family = 'binomial')
+
+summary(mod.1)
+```
+
+```{r}
+pred.2 <- df.nona[3:10,]
+prob.2 <- predict(mod.1, pred.2, type = 'response')
+prob.2
+```
+
+```{r}
+df.nona[3:10, 'numown']
+```
+
+```{r}
+ggplot(df.nona, aes(x = gross_inc, y = numown)) + 
+  geom_point(aes(color = numown), position = position_jitter(height = 0.03, 
+                                                             width = 0)) +
+  geom_smooth(method = "glm", method.args = list(family="binomial")) +
+  labs(y = "P(Own Home)", 
+       title = "Reddit Finance - Logistic Regression for Home Ownership") +
+  theme_bw() + scale_y_continuous(breaks = seq(0, 1, by = 0.1))
+```
+
+```{r}
+df.nona <- rename(df.nona, c('housing_exp' = '2020_housing_exp',
+                             'taxes' = '2020_taxes', 
+                             'gross_inc' = '2020_gross_inc'))
+
+X.nona <- model.matrix(numown~0+., data = df.nona)
+
+df.nona.centered <- scale(X.nona)
+
+X <- df.nona.centered
+y <- df.nona$numown
+
+lasso.1 <- glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+lasso.0 <- cv.glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+plot(lasso.1, label=T, xvar='lambda')+abline(v=log(lasso.0$lambda.1se))
+```
+
+```{r}
+ridge.1 <- glmnet(x=X, y=y, alpha = 0, family = 'binomial')
+
+ridge.0 <- cv.glmnet(x=X, y=y, alpha = 0, family = 'binomial')
+
+plot(ridge.1, label=T, xvar='lambda')+abline(v=log(ridge.0$lambda.1se))
+```
+
+```{r}
+corrs.2 <- correlate(df.nona, method = 'pearson')
+corrs.2
+```
+
+```{r}
+df.new <- select(df.nona, c(numown, fin_indy_pct, home_value,
+                            retirement_accts_tax, housing_exp, gross_inc,
+                            '2020_utilities_exp', '2020_necessities_exp',
+                            age, rel_status, children))
+
+df.new <- rename(df.new, c('utilities_exp' = '2020_utilities_exp',
+                           'necessities_exp' = '2020_necessities_exp'))
+summary(df.new)
+```
+
+```{r}
+mod.new <- glm(numown~., data = df.new, family = binomial)
+
+summary(mod.new)
+```
+
+```{r}
+df.new <- df.new %>% select(-c(necessities_exp, fin_indy_pct))
+
+mod.new.2 <- glm(numown~., data = df.new, family = binomial)
+summary(mod.new.2)
+```
+
+```{r}
+vif(mod.new.2)
+```
+
+```{r}
+X <- model.matrix(numown~0+., data = df.new)
+y <- df.new$numown
+
+lasso.1.1 <- glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+lasso.0.1 <- cv.glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+predict(lasso.1.1, type='coef', s=lasso.0.1$lambda.1se, newx = X[1:2,])
+```
+
+```{r}
+count(df.new, age)
+```
+
+```{r}
+df.new <- df.new %>%
+  filter(children != 'N/A',
+         rel_status != 'N/A',
+         age != 'N/A')
+
+
+X <- model.matrix(numown~0+., data = df.new)
+y <- df.new$numown
+
+lasso.1.2 <- glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+lasso.0.2 <- cv.glmnet(x=X, y=y, alpha = 1, family = 'binomial')
+
+predict(lasso.1.2, type='coef', s=lasso.0.2$lambda.1se, newx = X[1:2,])
+
+temp <- df.new %>% select(-c(retirement_accts_tax, age, necessities_exp,
+                             rel_status))
+
+mod.new.3 <- glm(numown ~ ., data = temp, family = binomial)
+summary(mod.new.3)
+```
+
+```{r}
+pred.1 <- df.new[1:10,]
+prob.1 <- predict(mod.new.3, pred.1, type = 'response')
+prob.1
+```
+
+```{r}
+df.new[1:10, 'numown']
+```
+
+```{r}
+quantile(residuals(mod.new.3))
+```
+
+```{r}
+vif(mod.new.3)
+```
+
+```{r}
+ggplot(temp, aes(x = log(housing_exp), y = numown)) + 
+  geom_point(aes(color = numown), position = position_jitter(height = 0.03, 
+                                                             width = 0)) +
+  geom_smooth(method = "glm", method.args = list(family="binomial")) +
+  labs(y = "P(Own Home)", 
+       title = "Reddit Finance - Logistic Regression for Home Ownership") +
+  theme_bw() + scale_y_continuous(breaks = seq(0, 1, by = 0.1))
+```
+
