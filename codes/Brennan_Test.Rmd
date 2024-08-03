@@ -5,10 +5,18 @@ date: "2024-08-03"
 output: html_document
 ---
 ```{r}
+library(dplyr)
+```
+
+
+```{r}
 df <- read.csv("C:/Users/Brennan Thompson/Documents/STAT6021/financial_independence/data/reddit_finance.csv")
 ```
 ```{r}
 df
+```
+```{r}
+
 ```
 
 
@@ -53,6 +61,9 @@ df
 # 2020_edu_exp
 # 
 # 2020_other_exp
+#
+# 
+#
 # OUTPUT VAR:
 # influence the Financial Independence (FI) number among American respondents? (AFNAN), 'fin_indy_num' and 'whn_fin_indy_num'
 ```
@@ -63,6 +74,60 @@ df
 
 
 ```{r}
+fin_df <- df %>% mutate(fin_indy_inst_amount = coalesce(fin_indy_num, 0) + coalesce(whn_fin_indy_num, 0))
+```
+```{r}
+fin_df <- filter(fin_df, country == "United States")
+
+fin_df <- select(fin_df, -c("rownames"))
+ 
+```
+
+```{r}
+fin_df
+```
+
+
+```{r}
+model_df <- fin_df %>%
+  select(c(fin_indy_inst_amount,
+           
+           retire_invst_num,
+           tgt_sf_wthdrw_rt,
+           num_incomes,
+           fin_indy_pct,
+           home_value,
+           tgt_sf_wthdrw_rt,
+           fin_indy_pct,
+           student_loans,
+#           mortgage,
+           auto_loan,
+           X2020_gross_inc,
+           X2020_housing_exp,
+#           X2020_utilities_exp,
+#           X2020_transp_exp,
+           X2020_necessities_exp,
+           X2020_lux_exp,
+           X2020_child_exp,
+#           X2020_debt_repay,
+#           X2020_invst_save,
+           X2020_charity,
+ #          X2020_healthcare_exp,
+ #          X2020_taxes,
+           X2020_edu_exp),
+         )
+```
+#Dropped off after auto_loan ish
+
+```{r}
+model1 <- lm(fin_indy_inst_amount~., data = model_df)
+summary(model1)
+```
+
+
+```{r}
+car::vif(model1)
+
 ```
 
 
