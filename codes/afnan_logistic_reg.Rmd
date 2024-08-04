@@ -1,0 +1,213 @@
+---
+title: "afnan_logistic_reg"
+author: "Afnan Alabdulwahab"
+date: "2024-08-04"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(pROC)
+```
+
+```{r}
+reddit_data <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/openintro/reddit_finance.csv")
+
+us_reddit_data <- reddit_data %>% filter(country == "United States")
+
+# Check the distribution of 'fin_indy' values
+fin_indy_distribution <- us_reddit_data %>% 
+  group_by(fin_indy) %>% 
+  summarise(count = n())
+
+# Print the distribution of 'fin_indy' values
+print(fin_indy_distribution)
+```
+```{r}
+# Visualize the distribution of 'fin_indy' values
+ggplot(fin_indy_distribution, aes(x = fin_indy, y = count, fill = fin_indy)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Distribution of Financial Independence Responses",
+       x = "Financial Independence (fin_indy)",
+       y = "Count",
+       fill = "Financial Independence")
+
+```
+This imbalance can pose challenges for logistic regression.
+
+
+```{r}
+# Check the distribution of 'gender' values
+gender_distribution <- us_reddit_data %>% 
+  group_by(gender) %>% 
+  summarise(count = n())
+
+# Print the distribution of 'gender' values
+print(gender_distribution)
+
+# Visualize the distribution of 'gender' values
+ggplot(gender_distribution, aes(x = gender, y = count, fill = gender)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Distribution of Gender Responses",
+       x = "Gender",
+       y = "Count",
+       fill = "Gender")
+
+```
+This distribution shows a significant imbalance, with a majority of respondents identifying as male.
+
+```{r}
+# Check the distribution of 'children' values
+children_distribution <- us_reddit_data %>% 
+  group_by(children) %>% 
+  summarise(count = n())
+
+# Print the distribution of 'children' values
+print(children_distribution)
+
+# Visualize the distribution of 'children' values
+ggplot(children_distribution, aes(x = children, y = count, fill = children)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Distribution of Children Responses",
+       x = "Children",
+       y = "Count",
+       fill = "Children")
+```
+Given the distribution, children could be a viable response variable
+
+
+Creating a Binary children Response Variable
+simplifying the children variable into a binary variable:
+
+1 if the respondent has children.
+0 if the respondent does not have children or intends to have children
+
+```{r}
+# Check for missing values in the 'children' column
+num_missing_childern <- sum(is.na(us_reddit_data$children))
+num_missing_childern
+```
+
+```{r}
+# Convert 'children' to a binary variable: 1 if "Have children", 0 otherwise
+us_reddit_data$children_binary <- ifelse(us_reddit_data$children == "Have children", 1, 0)
+```
+
+```{r}
+# Remove all columns with more than 50% missing values
+us_reddit_data2 <- us_reddit_data[, which(colMeans(!is.na(us_reddit_data)) > 0.5)]
+```
+
+```{r}
+# Remove rows with missing values in any selected column
+clean_data <- us_reddit_data2 %>%
+  dplyr::select(children_binary, fin_indy_pct, fin_indy_num, edu, age, num_incomes, gender, 
+                rel_status, home_value, brokerage_accts_tax, retirement_accts_tax, cash, invst_accts, 
+                spec_crypto, invst_prop_bus_own, other_val) %>%
+  drop_na()
+```
+
+We're left with 718 obs
+
+```{r}
+# Check unique levels of factors and handle numeric conversion issues
+clean_data <- clean_data %>%
+  mutate(
+    edu = factor(edu, levels = unique(edu)),
+    age = factor(age, levels = unique(age)),
+    gender = factor(gender, levels = unique(gender)),
+    rel_status = factor(rel_status, levels = unique(rel_status)),
+    num_incomes = as.numeric(num_incomes),
+    home_value = as.numeric(home_value),
+    brokerage_accts_tax = as.numeric(brokerage_accts_tax),
+    retirement_accts_tax = as.numeric(retirement_accts_tax),
+    cash = as.numeric(cash),
+    invst_accts = as.numeric(invst_accts),
+    spec_crypto = as.numeric(spec_crypto),
+    invst_prop_bus_own = as.numeric(invst_prop_bus_own),
+    other_val = as.numeric(other_val)
+  )
+
+# Check for levels with only one unique value and remove them
+#single_level_factors <- sapply(clean_data, function(col) is.factor(col) && length(unique(col)) == 1)
+# Remove factors with only one unique level
+clean_data <- clean_data %>% dplyr::select(where(~ !is.factor(.) || nlevels(.) > 1))
+```
+
+Ridge and Lasso for Feature Selection:
+```{r}
+# Prepare data for glmnet
+x <- model.matrix(children_binary ~ ., data = clean_data)[, -1]
+y <- clean_data$children_binary
+
+# Apply Ridge regression
+ridge_model <- glmnet(x, y, alpha = 0)
+cv_ridge <- cv.glmnet(x, y, alpha = 0)
+best_lambda_ridge <- cv_ridge$lambda.min
+ridge_model_final <- glmnet(x, y, alpha = 0, lambda = best_lambda_ridge)
+ridge_coefs <- coef(ridge_model_final)
+ridge_coefs
+
+# Apply Lasso regression
+lasso_model <- glmnet(x, y, alpha = 1)
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+best_lambda_lasso <- cv_lasso$lambda.min
+lasso_model_final <- glmnet(x, y, alpha = 1, lambda = best_lambda_lasso)
+lasso_coefs <- coef(lasso_model_final)
+lasso_coefs
+```
+
+Visualizing Important Predictors:
+
+```{r}
+# Extract non-zero coefficients from Lasso
+lasso_coefs_df <- as.data.frame(as.matrix(lasso_coefs))
+lasso_coefs_df$Predictor <- rownames(lasso_coefs_df)
+lasso_coefs_df <- lasso_coefs_df %>% filter(s0 != 0)
+
+# Plot the important predictors
+ggplot(lasso_coefs_df, aes(x = reorder(Predictor, s0), y = s0)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Important Predictors from Lasso Regression",
+       x = "Predictor",
+       y = "Coefficient")
+
+```
+
+```{r}
+selected_predictors <- coef(lasso_model_final)[, 1] != 0
+selected_predictors <- names(coef(lasso_model_final)[selected_predictors, ])
+selected_predictors <- selected_predictors[selected_predictors != "(Intercept)"]
+print(paste("Selected predictors:", paste(selected_predictors, collapse = ", ")))
+```
+Education, age, income, gender, relationship status, and financial stability are all critical factors that influence the decision to have children. By including these predictors in the logistic regression model, we can better understand the factors that contribute to family planning decisions.
+
+Create New Dataframe with Selected Predictors from Lasso:
+```{r}
+lasso_predictors <- c("edu", "age", "num_incomes", "gender", "rel_status", 
+                     "home_value", "brokerage_accts_tax", "retirement_accts_tax", "invst_accts")
+
+lasso_data <- clean_data %>%
+  dplyr::select(children_binary, all_of(lasso_predictors))
+```
+
+
+building a logistic regression model using only the selected predictors from the Lasso regression:
+```{r}
+# Build a logistic regression model using the new dataframe with selected predictors
+logistic_model <- glm(children_binary ~ ., data = lasso_data, family = binomial())
+
+# Summary of the logistic regression model
+summary(logistic_model)
+```
+
+
+
+
