@@ -1,0 +1,109 @@
+---
+title: "Logistic Regression - Home Ownership"
+author: "Isaac Levy"
+date: "2024-08-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(openintro)
+library(nationalparkcolors)
+library(PrettyCols)
+library(MASS)
+library(broom)
+library(caret)
+library(car)
+library(glmnet)
+library(pls)
+library(corrr)
+library(tidyverse)
+
+
+acadia <- park_palette('Acadia')
+autumn <- prettycols('Autumn')
+```
+
+## Data Import and Cleaning
+
+```{r data setup}
+data('reddit_finance')
+
+# select only respondants from the US
+df <- reddit_finance[reddit_finance$country == 'United States',]
+
+# remove all columns with more than 50% missing values
+df.2 <- df[, which(colMeans(!is.na(df)) > 0.5)]
+
+# remove all NAs in housing column
+df.2 <- df.2[!is.na(df.2$housing),]
+
+# recode housing variable to binary
+df.2 <- df.2 %>%
+  mutate(numown = ifelse(housing == 'Own', 1, 0))
+
+# drop columns we know we don't care about (i.e., country is all US, other columns have many NAs, etc.)
+df.6 <- df.2 %>%
+  select(-c(other_val, spec_crypto, invst_prop_bus_own, '2020_invst_save', 
+            '2020_healthcare_exp', country, housing))
+
+# drop any all NAs from current data set - left with 609 obs and 42 vars
+df.nona <- na.omit(df.6)
+
+# after some lasso variable selection and stepAIC models, select some variables of interest
+df.new <- select(df.nona, c(numown, fin_indy_pct, home_value,
+                            retirement_accts_tax, '2020_housing_exp',
+                            '2020_gross_inc', '2020_utilities_exp',
+                            '2020_necessities_exp', age, rel_status, children,))
+
+# rename some variables to not start with numbers
+df.new <- rename(df.new, c('utilities_exp' = '2020_utilities_exp',
+                           'necessities_exp' = '2020_necessities_exp',
+                           'gross_inc' = '2020_gross_inc',
+                           'housing_exp' = '2020_housing_exp'))
+
+# drop columns with insignificant p-values in model
+df.new <- df.new %>% select(-c(necessities_exp, fin_indy_pct, home_value))
+
+# it turns out these columns have text 'N/A's, drop them
+df.new <- df.new %>%
+  filter(children != 'N/A',
+         rel_status != 'N/A',
+         age != 'N/A')
+
+# drop more columns that have no significance, let with 596 obs and 4 3 predictors
+final <- df.new %>% select(-c(retirement_accts_tax, age, rel_status, gross_inc))
+```
+
+## The Model
+
+```{r}
+mod1 <- glm(numown ~ ., data = final, family = binomial)
+summary(mod1)
+```
+
+### Residuals
+
+```{r}
+quantile(residuals(mod1))
+```
+
+### VIF
+
+```{r}
+vif(mod1)
+```
+
+### Prediction Evaluation
+
+```{r}
+y_hat <- round(predict(mod1, type = 'response'), 3)
+y <- final$numown
+r <- round(residuals(mod1, type = 'response'), 3)
+rs <- round(rstandard(mod1, type = 'pearson'), 3)
+
+model.eval <- cbind(y, y_hat, r, rs)
+head(model.eval)
+```
+

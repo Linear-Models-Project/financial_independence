@@ -288,8 +288,7 @@ lasso.0.2 <- cv.glmnet(x=X, y=y, alpha = 1, family = 'binomial')
 
 predict(lasso.1.2, type='coef', s=lasso.0.2$lambda.1se, newx = X[1:2,])
 
-temp <- df.new %>% select(-c(retirement_accts_tax, age, necessities_exp,
-                             rel_status))
+temp <- df.new %>% select(-c(retirement_accts_tax, age, rel_status))
 
 mod.new.3 <- glm(numown ~ ., data = temp, family = binomial)
 summary(mod.new.3)
@@ -312,6 +311,16 @@ quantile(residuals(mod.new.3))
 ```{r}
 vif(mod.new.3)
 ```
+
+```{r}
+y_hat <- predict(mod.new.3, type = 'response')
+y <- temp$numown
+r <- residuals(mod.new.3, type = 'response')
+rs <- rstandard(mod.new.3, type = 'pearson')
+
+model.eval <- cbind(y, y_hat, r, rs)
+```
+
 
 ```{r}
 ggplot(temp, aes(x = log(housing_exp), y = numown)) + 
