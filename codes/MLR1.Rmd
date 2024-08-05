@@ -1,0 +1,238 @@
+---
+title: "MLR1"
+author: "VG_qtf7du"
+date: "2024-08-05"
+output: html_document
+---
+
+### MLR 1: Can we predict the Amount of Investment required at retirement based on the Lifestyle one leads?
+
+#### Importing Required Libraries
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(broom)
+library("ggpubr")
+```
+
+#### Reading the Data
+
+```{r}
+work_dir <- dirname(getwd())
+filepath <- paste(work_dir, 
+                  "/data/reddit_finance - vish - renamed_year_cols.csv", 
+                  sep = "") 
+fin_df <- read.csv(filepath)
+```
+
+#### Pre-Processing & Filters
+
+```{r}
+# only US Sample
+fin_df <- filter(fin_df, country == "United States")
+
+# Response Variable -> retire_invst_num
+fin_df <- filter(fin_df, 
+                 coalesce(retire_invst_num,0)>0 & 
+                 coalesce(retire_invst_num,0)<10000000)
+
+fin_df <- fin_df %>% mutate(retire_invst_num = (retire_invst_num)**(1/2))
+
+# Cleaning the Fin Indy Amount for both pops
+fin_df <- fin_df %>% 
+  mutate(fin_indy_inst_amount = 
+           coalesce(fin_indy_num, 0) + 
+           coalesce(whn_fin_indy_num, 0))
+fin_df %>% ggplot( aes(x = retire_invst_num)) + geom_histogram()
+
+
+ggqqplot(fin_df$retire_invst_num)
+```
+
+#### Major Transformations
+
+```{r}
+### BASIC TRANSFORMATIONS
+model_df <- fin_df %>% mutate(
+  tgt_sf_wthdrw_rt = coalesce(as.numeric(tgt_sf_wthdrw_rt),3),
+  tgt_sf_wthdrw_rt = ifelse(tgt_sf_wthdrw_rt < 15, tgt_sf_wthdrw_rt, NA),
+  tgt_sf_wthdrw_rt = coalesce(tgt_sf_wthdrw_rt, mean(tgt_sf_wthdrw_rt)),
+  
+  retire_exp = coalesce(as.numeric(retire_exp),0),
+  retire_exp = ifelse(retire_exp==0, mean(retire_exp), retire_exp),
+  
+  home_value = coalesce(home_value,0),
+  
+  brokerage_accts_tax = coalesce(brokerage_accts_tax,0),
+  brokerage_accts_tax = ifelse(brokerage_accts_tax!=0,
+                               brokerage_accts_tax, 
+                               mean(brokerage_accts_tax)),
+  
+  retirement_accts_tax = coalesce(retirement_accts_tax, 0),
+  retirement_accts_tax = ifelse(retirement_accts_tax==0, 
+                                mean(retirement_accts_tax), 
+                                retirement_accts_tax),
+  
+  cash = coalesce(cash, 0),
+  cash = ifelse(cash==0 | cash>100000, mean(cash), cash),
+  
+  invst_accts = coalesce(invst_accts, 0),
+  invst_accts = ifelse(invst_accts==0 | invst_accts>100000, 
+                       mean(invst_accts), 
+                       invst_accts),
+  
+  spec_crypto = coalesce(spec_crypto, 0),
+  
+  invst_prop_bus_own = coalesce(invst_prop_bus_own,0),
+  
+  student_loans = coalesce(student_loans,0),
+  
+  other_val = coalesce(other_val,0),
+  
+  auto_loan = coalesce(auto_loan,0),
+  
+  credit_personal_loan = coalesce(credit_personal_loan,0),
+  
+  medical_debt = coalesce(medical_debt,0),
+  
+  Y2020_gross_inc = coalesce(Y2020_gross_inc,0),
+  Y2020_housing_exp = coalesce(Y2020_housing_exp,0),
+  Y2020_utilities_exp = coalesce(Y2020_utilities_exp,0),
+  Y2020_transp_exp = coalesce(Y2020_transp_exp,0),
+  Y2020_necessities_exp = coalesce(Y2020_necessities_exp,0),
+  Y2020_lux_exp = coalesce(Y2020_lux_exp,0),
+  Y2020_child_exp = coalesce(Y2020_child_exp,0),
+  Y2020_debt_repay = coalesce(Y2020_debt_repay,0),
+  Y2020_invst_save = coalesce(Y2020_invst_save,0),
+  Y2020_charity = coalesce(Y2020_charity,0),
+  Y2020_healthcare_exp = coalesce(Y2020_healthcare_exp,0),
+  Y2020_taxes = coalesce(Y2020_taxes,0),
+  Y2020_edu_exp = coalesce(Y2020_edu_exp,0),
+  Y2020_other_exp = coalesce(Y2020_other_exp,0),
+
+  
+)
+
+
+
+model_df <- model_df %>% mutate(
+  fin_indy_inst_amount = (1 + fin_indy_inst_amount)**(1/4),
+  invst_prop_bus_own = log (1+invst_prop_bus_own),
+  Y2020_lux_exp = sqrt(1 + Y2020_lux_exp),
+  Y2020_gross_inc = sqrt(1 + Y2020_gross_inc)
+  
+  )
+
+model_df = dplyr::select(model_df, c(retire_invst_num,
+                              
+    # children,
+    
+    fin_indy_inst_amount,
+    tgt_sf_wthdrw_rt,
+    retire_exp,
+    home_value,
+    brokerage_accts_tax,
+    retirement_accts_tax,
+    cash,
+    invst_accts,
+    spec_crypto,
+    invst_prop_bus_own,
+    other_val,
+    student_loans,
+    auto_loan,
+    credit_personal_loan,
+    medical_debt,
+
+    Y2020_gross_inc,
+    Y2020_housing_exp,
+    Y2020_utilities_exp,
+    Y2020_transp_exp,
+    Y2020_necessities_exp,
+    Y2020_lux_exp,
+    Y2020_child_exp,
+    Y2020_debt_repay,
+    Y2020_invst_save,
+    Y2020_charity,
+    Y2020_healthcare_exp,
+    Y2020_taxes,
+    Y2020_edu_exp,
+    Y2020_other_exp,
+
+    
+    
+
+)
+    
+  
+)
+
+model_df2 <- gather(model_df, key = "predictor", value = "value", -retire_invst_num)
+
+
+model_df2 %>%
+  ggplot(
+    aes(y = retire_invst_num, x = value)
+  ) + 
+  geom_jitter() + 
+  facet_wrap(predictor ~ ., scale = "free") + 
+  geom_smooth(method = "lm")
+
+model_df <- na.omit(model_df)
+```
+
+#### OLS MODEL
+
+```{r}
+base_model <- lm(retire_invst_num~., model_df)
+bmsumm = summary(base_model)
+bmsumm
+
+
+bmvif <- car::vif(base_model)
+bmvif
+```
+
+#### OUTLIER REMOVAL
+
+```{r}
+bm_diag <- base_model %>%
+  augment(data = model_df) 
+bm_diag
+
+
+
+outliers = filter(bm_diag, abs(.std.resid)>=3)
+model_df_2 = filter(bm_diag, abs(.std.resid)<3)
+model_df_2 = dplyr::select(model_df_2, -starts_with("."))
+model_df_2
+```
+
+#### Re-Run Base OLS Model
+
+```{r}
+base_model2 <- lm(retire_invst_num~., model_df_2)
+bmsumm2 = summary(base_model2)
+bmsumm2
+
+
+bmvif2 <- car::vif(base_model2)
+bmvif2
+```
+
+#### AKAKI INFORMATION CRITERIA
+
+```{r}
+aic_model <- MASS::stepAIC(base_model2, direction = "both", trace = F) 
+summary(aic_model)
+```
+
+#### 
+
+#### Removing High p-value Features
+
+```{r}
+low_lm <- lm(retire_invst_num ~ . -Y2020_invst_save,data = model_df_2)
+aic_model <- MASS::stepAIC(low_lm, direction = "both", trace = F) 
+summary(aic_model)
+```
