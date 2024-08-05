@@ -98,12 +98,17 @@ vif(mod1)
 ### Prediction Evaluation
 
 ```{r}
+# predictions
 y_hat <- round(predict(mod1, type = 'response'), 3)
+# rounded predictions
+y_hat_rounded <- ifelse(y_hat > .50, 1, 0)
+# actual values
 y <- final$numown
+# residuals
 r <- round(residuals(mod1, type = 'response'), 3)
+# standardized reisduals
 rs <- round(rstandard(mod1, type = 'pearson'), 3)
-
-model.eval <- cbind(y, y_hat, r, rs)
+# bind columns together
+model.eval <- cbind(y, y_hat_rounded, y_hat, r, rs)
 head(model.eval)
 ```
-
