@@ -100,29 +100,56 @@ model_df <- fin_df %>%
            tgt_sf_wthdrw_rt,
            fin_indy_pct,
            student_loans,
-#           mortgage,
+          mortgage,
            auto_loan,
            X2020_gross_inc,
            X2020_housing_exp,
-#           X2020_utilities_exp,
-#           X2020_transp_exp,
-           X2020_necessities_exp,
+          X2020_utilities_exp,
+          X2020_transp_exp,
+         X2020_necessities_exp,
            X2020_lux_exp,
            X2020_child_exp,
-#           X2020_debt_repay,
-#           X2020_invst_save,
+          X2020_debt_repay,
+          X2020_invst_save,
            X2020_charity,
- #          X2020_healthcare_exp,
- #          X2020_taxes,
-           X2020_edu_exp),
+          X2020_healthcare_exp,
+          X2020_taxes,
+           X2020_edu_exp,
+
+
+
+
+            age,
+            fin_indy_pct
+
+
+),
          )
+model_df[is.na(model_df)] <- 0
 ```
 #Dropped off after auto_loan ish
+```{r}
+model_df
+```
 
 ```{r}
 model1 <- lm(fin_indy_inst_amount~., data = model_df)
 summary(model1)
 ```
+```{r}
+# As the tgt sf withdrawal rate goes down, as well as student loans
+```
+
+```{r}
+model2 <- MASS::stepAIC(model1, direction = "both", trace )
+summary(model2)
+```
+
+```{r}
+car::vif(model2)
+```
+
+
 
 
 ```{r}
@@ -132,14 +159,39 @@ car::vif(model1)
 
 
 ```{r}
+final_df <- model_df %>% select(fin_indy_inst_amount,
+                                retire_invst_num,
+                                tgt_sf_wthdrw_rt,
+                                num_incomes,  
+                                fin_indy_pct,
+                                home_value,
+                                X2020_housing_exp,
+                                X2020_lux_exp,
+                                X2020_child_exp,
+                                X2020_edu_exp)
+
+
+model_df$predd <- predict(final_df)
+
+
 ```
 
 
 ```{r}
+ind_pred<-mutate(na.omit(final_df), pred=fitted(model2), resid = residuals(model2))
+view(ind_pred)
 ```
 
 
 ```{r}
+
+ggplot(pranets_pred, aes(x=pred, y = resid))+geom_point()+
+  geom_hline(yintercept=0, color = 'red')
+```
+
+
+```{r}
+nrow(na.omit(final_df))
 ```
 
 
