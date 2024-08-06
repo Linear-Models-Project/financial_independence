@@ -23,27 +23,31 @@ work_dir <- dirname(getwd())
 filepath <- paste(work_dir, 
                   "/data/reddit_finance - vish - renamed_year_cols.csv", 
                   sep = "") 
-fin_df <- read.csv(filepath)
+fin_df_raw <- read.csv(filepath)
 ```
 
 #### Pre-Processing & Filters
 
 ```{r}
 # only US Sample
-fin_df <- filter(fin_df, country == "United States")
+fin_df <- filter(fin_df_raw, country == "United States")
 
 # Response Variable -> retire_invst_num
 fin_df <- filter(fin_df, 
-                 coalesce(retire_invst_num,0)>0 & 
+                 coalesce(retire_invst_num,0)>1200 & 
                  coalesce(retire_invst_num,0)<10000000)
 
-fin_df <- fin_df %>% mutate(retire_invst_num = (retire_invst_num)**(1/2))
+fin_df <- fin_df %>% mutate(retire_invst_num = log(retire_invst_num))
 
 # Cleaning the Fin Indy Amount for both pops
 fin_df <- fin_df %>% 
   mutate(fin_indy_inst_amount = 
            coalesce(fin_indy_num, 0) + 
-           coalesce(whn_fin_indy_num, 0))
+           coalesce(whn_fin_indy_num, 0),
+         
+         fin_indy_inst_amount = ifelse(fin_indy_inst_amount==0, mean(fin_indy_inst_amount), fin_indy_inst_amount))
+
+
 fin_df %>% ggplot( aes(x = retire_invst_num)) + geom_histogram()
 
 
@@ -55,14 +59,17 @@ ggqqplot(fin_df$retire_invst_num)
 ```{r}
 ### BASIC TRANSFORMATIONS
 model_df <- fin_df %>% mutate(
-  tgt_sf_wthdrw_rt = coalesce(as.numeric(tgt_sf_wthdrw_rt),3),
+  tgt_sf_wthdrw_rt = coalesce(as.numeric(tgt_sf_wthdrw_rt),7.5),
   tgt_sf_wthdrw_rt = ifelse(tgt_sf_wthdrw_rt < 15, tgt_sf_wthdrw_rt, NA),
   tgt_sf_wthdrw_rt = coalesce(tgt_sf_wthdrw_rt, mean(tgt_sf_wthdrw_rt)),
   
   retire_exp = coalesce(as.numeric(retire_exp),0),
   retire_exp = ifelse(retire_exp==0, mean(retire_exp), retire_exp),
   
-  home_value = coalesce(home_value,0),
+  tgt_sf_wthdrw_val = retire_exp/tgt_sf_wthdrw_rt,
+  
+  home_value = coalesce(as.numeric(home_value),0),
+  home_value = ifelse(home_value==0, mean(home_value)/2, home_value),
   
   brokerage_accts_tax = coalesce(brokerage_accts_tax,0),
   brokerage_accts_tax = ifelse(brokerage_accts_tax!=0,
@@ -118,18 +125,22 @@ model_df <- fin_df %>% mutate(
 
 model_df <- model_df %>% mutate(
   fin_indy_inst_amount = (1 + fin_indy_inst_amount)**(1/4),
+  tgt_sf_wthdrw_val =tgt_sf_wthdrw_val,
   invst_prop_bus_own = log (1+invst_prop_bus_own),
   Y2020_lux_exp = sqrt(1 + Y2020_lux_exp),
-  Y2020_gross_inc = sqrt(1 + Y2020_gross_inc)
+  Y2020_gross_inc = sqrt(1 + Y2020_gross_inc),
+  
+  brokerage_accts_tax = log(brokerage_accts_tax),
+  
+  cash = cash,
+  # Y2020_utilities_exp = (Y2020_utilities_exp)**(1/3)
   
   )
 
 model_df = dplyr::select(model_df, c(retire_invst_num,
                               
-    # children,
-    
     fin_indy_inst_amount,
-    tgt_sf_wthdrw_rt,
+    tgt_sf_wthdrw_val,
     retire_exp,
     home_value,
     brokerage_accts_tax,
@@ -159,7 +170,7 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
     Y2020_edu_exp,
     Y2020_other_exp,
 
-    
+
     
 
 )
@@ -179,6 +190,8 @@ model_df2 %>%
   geom_smooth(method = "lm")
 
 model_df <- na.omit(model_df)
+cor1 = cor(model_df)
+cor1
 ```
 
 #### OLS MODEL
@@ -227,12 +240,27 @@ aic_model <- MASS::stepAIC(base_model2, direction = "both", trace = F)
 summary(aic_model)
 ```
 
-#### 
-
 #### Removing High p-value Features
 
 ```{r}
 low_lm <- lm(retire_invst_num ~ . -Y2020_invst_save,data = model_df_2)
+summary(low_lm)
 aic_model <- MASS::stepAIC(low_lm, direction = "both", trace = F) 
 summary(aic_model)
+```
+
+#### Regularization
+
+```{r}
+library(glmnet)
+X = model.matrix(retire_invst_num~0+., data = model_df)
+y = model_df$retire_invst_num
+
+rmodel <- glmnet(x=X, y=y, alpha = 1)
+plot(rmodel, label = T, xvar = "lambda")
+```
+
+```{r}
+kfcvglmnet <- cv.glmnet(x=X, y=y, alpha=1, nfolds=3)
+plot(kfcvglmnet, label = T, xvar = "lambda")
 ```
