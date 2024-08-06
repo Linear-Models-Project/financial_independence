@@ -18,6 +18,8 @@ library(car)
 library(glmnet)
 library(pls)
 library(corrr)
+library(factoextra)
+library(FactoMineR)
 library(tidyverse)
 
 
@@ -170,7 +172,63 @@ model.eval %>%
   geom_histogram(stat = 'count')
 ```
 
+## Principal components of mixed types using FactoMineR
 ```{r}
-plot(df.pca, type='l')
+data('reddit_finance')
+
+# select only respondants from the US
+df <- reddit_finance[reddit_finance$country == 'United States',]
+
+# remove all columns with more than 50% missing values
+df.2 <- df[, which(colMeans(!is.na(df)) > 0.5)]
+
+# remove all NAs in housing column
+df.2 <- df.2[!is.na(df.2$housing),]
+
+# recode housing variable to binary
+df.2 <- df.2 %>%
+  mutate(numown = ifelse(housing == 'Own', 1, 0))
+
+# drop columns we know we don't care about (i.e., country is all US, other columns have many NAs, etc.)
+df.6 <- df.2 %>%
+  select(-c(other_val, spec_crypto, invst_prop_bus_own, '2020_invst_save', 
+            '2020_healthcare_exp', country, housing)) %>%
+  na.omit()
+
+res.famd <- FAMD(df.6,
+                 ncp = 30,
+                 sup.var = 42,
+                 graph = F)
+
+mca.mod.data <- data.frame(numown=df.6$numown, res.famd$svd$U)
+
+mca.mod.max <- glm(numown~., data = mca.mod.data, family = binomial)
+
+mca.mod.aic <- stepAIC(mca.mod.max, direction = 'both', trace = F, method = 'glm')
+summary(mca.mod.aic)
 ```
 
+```{r}
+# predictions
+y_hat.famd <- round(predict(mca.mod.aic, type = 'response'), 3)
+# rounded predictions
+y_hat_rounded.famd <- ifelse(y_hat.famd > .50, 1, 0)
+# actual values
+y.famd <- mca.mod.data$numown
+# residuals
+r.famd <- round(residuals(mca.mod.aic, type = 'response'), 3)
+# bind columns together
+model.eval.famd <- data.frame(cbind(y.famd, y_hat_rounded.famd,
+                                    y_hat.famd, r.famd))
+head(model.eval.famd)
+```
+
+
+```{r}
+# residuals look better than base model but maybe worse than PCA model
+
+model.eval.famd %>%
+  ggplot() +
+  aes(x=r.famd) +
+  geom_histogram(stat = 'count')
+```
