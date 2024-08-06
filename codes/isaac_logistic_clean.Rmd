@@ -106,9 +106,71 @@ y_hat_rounded <- ifelse(y_hat > .50, 1, 0)
 y <- final$numown
 # residuals
 r <- round(residuals(mod1, type = 'response'), 3)
-# standardized reisduals
-rs <- round(rstandard(mod1, type = 'pearson'), 3)
 # bind columns together
-model.eval <- cbind(y, y_hat_rounded, y_hat, r, rs)
+model.eval <- data.frame(cbind(y, y_hat_rounded, y_hat, r))
 head(model.eval)
 ```
+
+## PCA
+
+```{r}
+# select only numeric columns and numown
+df.numeric <- df.2 %>%
+  select(c(numown, '2020_gross_inc', '2020_housing_exp', '2020_utilities_exp', 
+           '2020_transp_exp', '2020_necessities_exp', '2020_lux_exp',
+           '2020_invst_save', '2020_healthcare_exp', '2020_taxes', cash,
+           retirement_accts_tax,brokerage_accts_tax, home_value, retire_exp,
+           tgt_sf_wthdrw_rt, retire_invst_num, fin_indy_num, fin_indy_pct)) %>%
+  na.omit()
+
+df.pca <- princomp(df.numeric[-1], fix_sign = T, cor = T)
+
+pca.dat <- data.frame(numown=df.numeric$numown, df.pca$scores)
+
+logit.pca <- glm(numown~., data = pca.dat, family = binomial)
+logit.pca.aic <- stepAIC(logit.pca, direction = 'both', trace = F, method = 'glm')
+
+summary(logit.pca.aic)
+```
+
+```{r}
+# predictions
+y_hat.pca <- round(predict(logit.pca.aic, type = 'response'), 3)
+# rounded predictions
+y_hat_rounded.pca <- ifelse(y_hat.pca > .50, 1, 0)
+# actual values
+y.pca <- pca.dat$numown
+# residuals
+r.pca <- round(residuals(logit.pca.aic, type = 'response'), 3)
+# bind columns together
+model.eval.pca <- data.frame(cbind(y.pca, y_hat_rounded.pca, y_hat.pca, r.pca))
+head(model.eval.pca)
+```
+
+```{r}
+quantile(residuals(logit.pca.aic))
+```
+
+
+```{r}
+# PCA residuals look really good
+
+model.eval.pca %>%
+  ggplot() +
+  aes(x=r.pca) +
+  geom_density(stat = 'count')
+```
+
+```{r}
+# Non-PCA residuals look worse than PCA residuals
+
+model.eval %>%
+  ggplot() +
+  aes(x=r) +
+  geom_histogram(stat = 'count')
+```
+
+```{r}
+plot(df.pca, type='l')
+```
+
