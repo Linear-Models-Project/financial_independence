@@ -164,6 +164,12 @@ model.eval.pca %>%
 ```
 
 ```{r}
+# We can account for all of the variance with these principal components!!
+summary(df.pca)
+```
+
+
+```{r}
 # Non-PCA residuals look worse than PCA residuals
 
 model.eval %>%
@@ -196,7 +202,7 @@ df.6 <- df.2 %>%
   na.omit()
 
 res.famd <- FAMD(df.6,
-                 ncp = 30,
+                 ncp = 41,
                  sup.var = 42,
                  graph = F)
 
@@ -232,3 +238,9 @@ model.eval.famd %>%
   aes(x=r.famd) +
   geom_histogram(stat = 'count')
 ```
+
+```{r}
+# All of the dimensions only account for 53.74% of variance!!! Boo
+get_eigenvalue(res.famd)
+```
+
