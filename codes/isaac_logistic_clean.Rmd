@@ -150,6 +150,61 @@ head(model.eval.pca)
 ```
 
 ```{r}
+ctrl <- trainControl(method = 'cv', number = 10,
+                     summaryFunction = twoClassSummary,
+                     classProbs = T, savePredictions = T)
+
+pca.dat$numown <- ifelse(pca.dat$numown == 1, 'DoesOwn', 'NotOwn')
+
+logit.pca.train <- train(numown~., method = 'glm', data = pca.dat, family = binomial,
+                       trControl = ctrl, metric = 'ROC')
+# i missed some steps here
+predictions <- logit.pca.train$pred
+
+roc <- roc(predictions$obs, predictions$DoesOwn)
+
+roc.dat <- data.frame(TPR = roc$sensitivities, FPR = 1-roc$specificities)
+
+ggplot(roc.dat, aes(x=FPR, y=TPR))+geom_line(color='forestgreen')
+```
+
+```{r}
+roc
+```
+
+
+#### Confusion Matrix for PCA
+
+```{r}
+expected.vals.pca <- factor(df.numeric$numown)
+predicted.vals.pca <- factor(ifelse(predict(logit.pca.aic) > .7, 1, 0))
+confuse.pca <- confusionMatrix(data = predicted.vals.pca,
+                               reference = expected.vals.pca)
+confuse.pca
+```
+
+### Confusion Matrix for Regular GLM
+
+```{r}
+expected.vals <- factor(final$numown)
+predicted.vals <- factor(ifelse(predict(mod1) > .7, 1, 0))
+confuse <- confusionMatrix(data = predicted.vals, reference = expected.vals)
+confuse
+```
+
+### Confusion Matrix for FAMD
+
+```{r}
+expected.vals.famd <- factor(df.6$numown)
+predicted.vals.famd <- factor(ifelse(predict(mca.mod.aic) > .7, 1, 0))
+confuse.famd <- confusionMatrix(data = predicted.vals.famd,
+                                reference = expected.vals.famd)
+confuse.famd
+```
+
+
+
+```{r}
 quantile(residuals(logit.pca.aic))
 ```
 
@@ -162,6 +217,12 @@ model.eval.pca %>%
   aes(x=r.pca) +
   geom_density(stat = 'count')
 ```
+
+```{r}
+# We can account for all of the variance with these principal components!!
+summary(df.pca)
+```
+
 
 ```{r}
 # Non-PCA residuals look worse than PCA residuals
@@ -196,7 +257,7 @@ df.6 <- df.2 %>%
   na.omit()
 
 res.famd <- FAMD(df.6,
-                 ncp = 30,
+                 ncp = 41,
                  sup.var = 42,
                  graph = F)
 
@@ -232,3 +293,9 @@ model.eval.famd %>%
   aes(x=r.famd) +
   geom_histogram(stat = 'count')
 ```
+
+```{r}
+# All of the dimensions only account for 53.74% of variance!!! Boo
+get_eigenvalue(res.famd)
+```
+
