@@ -34,10 +34,10 @@ fin_df <- filter(fin_df_raw, country == "United States")
 
 # Response Variable -> retire_invst_num
 fin_df <- filter(fin_df, 
-                 coalesce(retire_invst_num,0)>1200 & 
+                 coalesce(retire_invst_num,0)>1000 & 
                  coalesce(retire_invst_num,0)<10000000)
 
-fin_df <- fin_df %>% mutate(retire_invst_num = log(retire_invst_num))
+fin_df <- fin_df %>% mutate(retire_invst_num = (retire_invst_num)**(0.5))
 
 # Cleaning the Fin Indy Amount for both pops
 fin_df <- fin_df %>% 
@@ -45,10 +45,12 @@ fin_df <- fin_df %>%
            coalesce(fin_indy_num, 0) + 
            coalesce(whn_fin_indy_num, 0),
          
-         fin_indy_inst_amount = ifelse(fin_indy_inst_amount==0, mean(fin_indy_inst_amount), fin_indy_inst_amount))
+         fin_indy_inst_amount = ifelse(fin_indy_inst_amount==0, 
+                                       mean(fin_indy_inst_amount),
+                                       fin_indy_inst_amount))
 
 
-fin_df %>% ggplot( aes(x = retire_invst_num)) + geom_histogram()
+fin_df %>% ggplot(aes(x = retire_invst_num)) + geom_histogram()
 
 
 ggqqplot(fin_df$retire_invst_num)
@@ -90,17 +92,11 @@ model_df <- fin_df %>% mutate(
                        invst_accts),
   
   spec_crypto = coalesce(spec_crypto, 0),
-  
   invst_prop_bus_own = coalesce(invst_prop_bus_own,0),
-  
   student_loans = coalesce(student_loans,0),
-  
   other_val = coalesce(other_val,0),
-  
   auto_loan = coalesce(auto_loan,0),
-  
   credit_personal_loan = coalesce(credit_personal_loan,0),
-  
   medical_debt = coalesce(medical_debt,0),
   
   Y2020_gross_inc = coalesce(Y2020_gross_inc,0),
@@ -124,15 +120,20 @@ model_df <- fin_df %>% mutate(
 
 
 model_df <- model_df %>% mutate(
-  fin_indy_inst_amount = (1 + fin_indy_inst_amount)**(1/4),
-  tgt_sf_wthdrw_val =tgt_sf_wthdrw_val,
-  invst_prop_bus_own = log (1+invst_prop_bus_own),
-  Y2020_lux_exp = sqrt(1 + Y2020_lux_exp),
-  Y2020_gross_inc = sqrt(1 + Y2020_gross_inc),
-  
-  brokerage_accts_tax = log(brokerage_accts_tax),
-  
-  cash = cash,
+  fin_indy_inst_amount = (fin_indy_inst_amount)**(1/2),
+  tgt_sf_wthdrw_val =tgt_sf_wthdrw_val**0.5,
+  retire_exp = retire_exp**0.5,
+  home_value = sqrt(home_value),
+  invst_accts = invst_accts**0.5,
+  retirement_accts_tax = sqrt(retirement_accts_tax),
+  invst_prop_bus_own = sqrt(invst_prop_bus_own),
+  Y2020_lux_exp = sqrt(Y2020_lux_exp),
+  Y2020_gross_inc = log(1 + Y2020_gross_inc),
+  spec_crypto = log(1 + spec_crypto),
+  brokerage_accts_tax = sqrt(brokerage_accts_tax),
+  auto_loan = sqrt(auto_loan),
+  cash = cash**0.5,
+  credit_personal_loan = credit_personal_loan,
   # Y2020_utilities_exp = (Y2020_utilities_exp)**(1/3)
   
   )
@@ -141,6 +142,7 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
                               
     fin_indy_inst_amount,
     tgt_sf_wthdrw_val,
+    tgt_sf_wthdrw_rt,
     retire_exp,
     home_value,
     brokerage_accts_tax,
@@ -154,6 +156,11 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
     auto_loan,
     credit_personal_loan,
     medical_debt,
+    other_debt,
+    mortgage, 
+    fin_indy_pct,
+    
+
 
     Y2020_gross_inc,
     Y2020_housing_exp,
@@ -169,9 +176,6 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
     Y2020_taxes,
     Y2020_edu_exp,
     Y2020_other_exp,
-
-
-    
 
 )
     
@@ -192,6 +196,10 @@ model_df2 %>%
 model_df <- na.omit(model_df)
 cor1 = cor(model_df)
 cor1
+```
+
+```{r}
+nums <- data.frame(names(fin_df)[sapply(fin_df, is.numeric)])
 ```
 
 #### OLS MODEL
@@ -217,6 +225,7 @@ bm_diag
 
 outliers = filter(bm_diag, abs(.std.resid)>=3)
 model_df_2 = filter(bm_diag, abs(.std.resid)<3)
+model_df_2 = filter(model_df_2, abs(.hat)<3)
 model_df_2 = dplyr::select(model_df_2, -starts_with("."))
 model_df_2
 ```
@@ -243,18 +252,73 @@ summary(aic_model)
 #### Removing High p-value Features
 
 ```{r}
-low_lm <- lm(retire_invst_num ~ . -Y2020_invst_save,data = model_df_2)
+low_lm <- lm(retire_invst_num ~ .,data = model_df_2)
 summary(low_lm)
 aic_model <- MASS::stepAIC(low_lm, direction = "both", trace = F) 
 summary(aic_model)
 ```
 
-#### Regularization
+#### Final Selected Model
+
+```{r}
+final_model_df = na.omit(dplyr::select(model_df_2, retire_invst_num,
+                               
+fin_indy_inst_amount ,
+tgt_sf_wthdrw_rt ,
+retire_exp ,
+home_value ,
+brokerage_accts_tax ,
+retirement_accts_tax ,
+invst_prop_bus_own ,
+other_val ,
+student_loans ,
+credit_personal_loan ,
+medical_debt ,
+other_debt ,
+mortgage ,
+fin_indy_pct ,
+Y2020_gross_inc ,
+Y2020_housing_exp ,
+Y2020_utilities_exp ,
+Y2020_transp_exp ,
+Y2020_necessities_exp ,
+Y2020_lux_exp ,
+Y2020_debt_repay ,
+Y2020_healthcare_exp ,
+Y2020_taxes ,
+Y2020_edu_exp ,
+Y2020_other_exp ,
+
+
+
+                                
+                          
+
+))
+
+final_model = lm(retire_invst_num ~ ., data = final_model_df)
+summary(final_model)
+diagnostics <- augment(final_model, data = na.omit(final_model_df))
+diagnostics %>% ggplot(aes(x = .fitted,y = .resid)) + geom_jitter()
+```
+
+#### Residual Analysis
+
+```{r}
+diagnostics <- augment(final_model, data = na.omit(final_model_df))
+diagnostics %>% ggplot(aes(x = .fitted,y = .resid)) + geom_jitter()
+```
+
+```{r}
+data.frame(car::vif(final_model))
+```
+
+#### Regularization Attempt
 
 ```{r}
 library(glmnet)
-X = model.matrix(retire_invst_num~0+., data = model_df)
-y = model_df$retire_invst_num
+X = model.matrix(retire_invst_num~0+., data = model_df_2)
+y = model_df_2$retire_invst_num
 
 rmodel <- glmnet(x=X, y=y, alpha = 1)
 plot(rmodel, label = T, xvar = "lambda")
@@ -263,4 +327,11 @@ plot(rmodel, label = T, xvar = "lambda")
 ```{r}
 kfcvglmnet <- cv.glmnet(x=X, y=y, alpha=1, nfolds=3)
 plot(kfcvglmnet, label = T, xvar = "lambda")
+```
+
+```{r}
+X = model.matrix(retire_invst_num~0+., data = model_df)
+y = model_df$retire_invst_num
+rmodel <- glmnet(x=X, y=y, alpha = 1)
+plot(rmodel, label = T, xvar = "lambda")
 ```
