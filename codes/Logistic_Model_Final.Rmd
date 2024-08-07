@@ -5,9 +5,12 @@ date: "2024-08-07"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
 
+```{r setup}
+suppressPackageStartupMessages({
 library(openintro)
 library(nationalparkcolors)
 library(PrettyCols)
@@ -24,11 +27,12 @@ library(tidyverse)
 
 acadia <- park_palette('Acadia')
 autumn <- prettycols('Autumn')
+})
 ```
 
 ## Data Import and Cleaning
 
-```{r}
+```{r data import and cleaning}
 data('reddit_finance') # from the openintro library
 
 # select only respondants from the US
@@ -56,7 +60,8 @@ df.numeric <- df.2 %>%
 
 ## The Model
 
-```{r}
+```{r build model}
+suppressWarnings({
 # create princomp of remaining numeric variables
 df.pca <- princomp(df.numeric[-1], fix_sign = T, cor = T)
 # create dataframe with princomp scores and response variable
@@ -67,11 +72,14 @@ logit.pca <- glm(numown~., data = pca.dat, family = binomial)
 logit.pca.aic <- stepAIC(logit.pca, direction = 'both', trace = F, method = 'glm')
 # summary of best model as determined by stepAIC
 summary(logit.pca.aic)
+})
 ```
 
 ## Model Predictions vs Observed
 
-```{r}
+Checking true values vs predicted, using a threshold of .7. Calculated residuals, $\hat{y}$ , and rounded $\hat{y}$  for each observation. Displaying rows 50-100 as an example.
+
+```{r make predictions for each observation}
 # predictions
 y_hat<- round(predict(logit.pca.aic, type = 'response'), 3)
 # rounded predictions
@@ -82,23 +90,36 @@ y <- pca.dat$numown
 resids <- round(residuals(logit.pca.aic, type = 'response'), 3)
 # bind columns together
 model.eval<- data.frame(cbind(y, y_hat_rounded, y_hat, resids))
-head(model.eval)
+model.eval[50:100,]
 ```
 
 ### Residuals
 
-```{r}
-# PCA residuals look really good
+Residuals look really good
 
+#### Residual Distribution Plot
+
+```{r plot residual dist}
 model.eval %>%
   ggplot() +
   aes(x=resids) +
   geom_density(stat = 'count')
 ```
 
+#### Residuals Quantiles
+
+Centered near 0, 2nd and 3rd quantiles have similar magnitude, some negative skew for lower values.
+
+```{r residual quantiles}
+quantile(residuals(logit.pca.aic))
+```
+
+
 ### Confusion Matrix
 
-```{r}
+Using a threshold of .7, we still have 94.33% accuracy. 95% confidence interval of (0.9208, 0.9609).
+
+```{r confusion matrix}
 expected.vals.pca <- factor(df.numeric$numown)
 predicted.vals.pca <- factor(ifelse(predict(logit.pca.aic) > .7, 1, 0))
 confuse.pca <- confusionMatrix(data = predicted.vals.pca,
@@ -108,7 +129,10 @@ confuse.pca
 
 ### ROC Curve and Area Under Curve
 
-```{r}
+ROC curve looks very strong.
+
+```{r roc curve}
+suppressWarnings({
 ctrl <- trainControl(method = 'cv', number = 10,
                      summaryFunction = twoClassSummary,
                      classProbs = T, savePredictions = T)
@@ -119,7 +143,7 @@ dat$numown <- ifelse(dat$numown == 1, 'DoesOwn', 'NotOwn')
 
 logit.pca.train <- train(numown~., method = 'glm', data = dat,
                          family = binomial, trControl = ctrl, metric = 'ROC')
-# i missed some steps here
+})
 predictions <- logit.pca.train$pred
 
 roc <- roc(predictions$obs, predictions$DoesOwn)
@@ -129,7 +153,9 @@ roc.dat <- data.frame(TPR = roc$sensitivities, FPR = 1-roc$specificities)
 ggplot(roc.dat, aes(x=FPR, y=TPR))+geom_line(color=autumn[1])
 ```
 
-```{r}
+Area under curve is very close to 0.
+
+```{r roc value}
 roc
 ```
 
@@ -139,7 +165,9 @@ roc
 
 ### Relationship Between Log Odds and Components
 
-```{r}
+Most of the components have a linear relationship with the log odds, but there are some exceptions. Components 4, 6, and 11 are noticeably not great, but the rest look better.
+
+```{r log odds}
 # create vector of log-odds
 probabilities <- predict(logit.pca.aic, type = 'response')
 logit = log(probabilities/(1-probabilities))
@@ -158,7 +186,9 @@ model.df %>%
 
 ### Multicollinearity
 
-```{r}
+No multicollinearity, although this is expected because of PCA.
+
+```{r multicollinearity}
 vif(logit.pca.aic)
 ```
 
