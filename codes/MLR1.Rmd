@@ -252,10 +252,14 @@ summary(aic_model)
 #### Removing High p-value Features
 
 ```{r}
-low_lm <- lm(retire_invst_num ~ .,data = model_df_2)
+low_lm <- lm(retire_invst_num ~ .
+             -Y2020_transp_exp -Y2020_necessities_exp -Y2020_invst_save    
+             -fin_indy_pct -home_value -tgt_sf_wthdrw_val
+             ,data = model_df_2)
 summary(low_lm)
 aic_model <- MASS::stepAIC(low_lm, direction = "both", trace = F) 
 summary(aic_model)
+data.frame(car::vif(aic_model))
 ```
 
 #### Final Selected Model
@@ -263,31 +267,50 @@ summary(aic_model)
 ```{r}
 final_model_df = na.omit(dplyr::select(model_df_2, retire_invst_num,
                                
+# fin_indy_inst_amount ,
+# tgt_sf_wthdrw_rt ,
+# retire_exp ,
+# home_value ,
+# brokerage_accts_tax ,
+# retirement_accts_tax ,
+# invst_prop_bus_own ,
+# other_val ,
+# student_loans ,
+# credit_personal_loan ,
+# medical_debt ,
+# other_debt ,
+# mortgage ,
+# fin_indy_pct ,
+# Y2020_gross_inc ,
+# Y2020_housing_exp ,
+# Y2020_utilities_exp ,
+# Y2020_transp_exp ,
+# Y2020_necessities_exp ,
+# Y2020_lux_exp ,
+# Y2020_debt_repay ,
+# Y2020_healthcare_exp ,
+# Y2020_taxes ,
+# Y2020_edu_exp ,
+# Y2020_other_exp ,
+
+
+
 fin_indy_inst_amount ,
 tgt_sf_wthdrw_rt ,
 retire_exp ,
-home_value ,
 brokerage_accts_tax ,
 retirement_accts_tax ,
-invst_prop_bus_own ,
-other_val ,
-student_loans ,
-credit_personal_loan ,
+cash ,
+auto_loan ,
 medical_debt ,
 other_debt ,
 mortgage ,
-fin_indy_pct ,
-Y2020_gross_inc ,
 Y2020_housing_exp ,
 Y2020_utilities_exp ,
-Y2020_transp_exp ,
-Y2020_necessities_exp ,
 Y2020_lux_exp ,
-Y2020_debt_repay ,
 Y2020_healthcare_exp ,
 Y2020_taxes ,
 Y2020_edu_exp ,
-Y2020_other_exp ,
 
 
 
