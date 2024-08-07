@@ -137,7 +137,7 @@ quantile(residuals(logit.final))
 
 ### Confusion Matrix
 
-Using a threshold of .7, we still have 94.33% accuracy. 95% confidence interval of (0.9208, 0.9609).
+Using a threshold of .7, we still have 94.86% accuracy. 95% confidence interval of (0.927, 0.9653).
 
 ```{r confusion matrix}
 expected.vals.pca <- factor(df.numeric.trans$numown)
@@ -185,7 +185,7 @@ roc
 
 ### Relationship Between Log Odds and Components
 
-Most of the components have a linear relationship with the log odds, but there are some exceptions. Components 4, 6, and 11 are noticeably not great, but the rest look better.
+The components generally have a linear relationship with the log odds.
 
 ```{r log odds}
 # create vector of log-odds
