@@ -122,7 +122,7 @@ df.numeric <- df.2 %>%
            '2020_transp_exp', '2020_necessities_exp', '2020_lux_exp',
            '2020_invst_save', '2020_healthcare_exp', '2020_taxes', cash,
            retirement_accts_tax,brokerage_accts_tax, home_value, retire_exp,
-           tgt_sf_wthdrw_rt, retire_invst_num, fin_indy_num, fin_indy_pct)) %>%
+           retire_invst_num, fin_indy_num, fin_indy_pct)) %>%
   na.omit()
 
 df.pca <- princomp(df.numeric[-1], fix_sign = T, cor = T)
@@ -170,6 +170,37 @@ ggplot(roc.dat, aes(x=FPR, y=TPR))+geom_line(color='forestgreen')
 
 ```{r}
 roc
+```
+
+
+```{r}
+df.numeric <- df.numeric %>%
+  rename(c(healthcare_exp = '2020_healthcare_exp',
+           housing_exp = '2020_housing_exp',
+           gross_inc = '2020_gross_inc',
+           utilities_exp = '2020_utilities_exp',
+           transp_exp = '2020_transp_exp',
+           lux_exp = '2020_lux_exp',
+           invst_save = '2020_invst_save', 
+           taxes = '2020_taxes'))
+
+df.numeric.trans <- df.numeric %>%
+  mutate(retire_invst_num = log(1+retire_invst_num),
+         healthcare_exp = log(1+healthcare_exp),
+         housing_exp = log(1+housing_exp),
+         fin_indy_num = log(1+fin_indy_num),
+         invst_save = log(1+invst_save))
+
+
+model.df <- gather(df.numeric.trans, key = 'predictor', value = 'value', -numown)
+
+model.df %>%
+  ggplot() +
+  aes(y=numown, x=value) +
+  geom_jitter() +
+  facet_wrap(predictor~., scale = 'free') +
+  geom_smooth(method = 'lm')
+
 ```
 
 
