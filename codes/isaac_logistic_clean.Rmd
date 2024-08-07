@@ -125,7 +125,24 @@ df.numeric <- df.2 %>%
            retire_invst_num, fin_indy_num, fin_indy_pct)) %>%
   na.omit()
 
-df.pca <- princomp(df.numeric[-1], fix_sign = T, cor = T)
+df.numeric <- df.numeric %>%
+  rename(c(healthcare_exp = '2020_healthcare_exp',
+           housing_exp = '2020_housing_exp',
+           gross_inc = '2020_gross_inc',
+           utilities_exp = '2020_utilities_exp',
+           transp_exp = '2020_transp_exp',
+           lux_exp = '2020_lux_exp',
+           invst_save = '2020_invst_save', 
+           taxes = '2020_taxes'))
+
+df.numeric.trans <- df.numeric %>%
+  mutate(retire_invst_num = log(1+retire_invst_num),
+         healthcare_exp = log(1+healthcare_exp),
+         housing_exp = log(1+housing_exp),
+         fin_indy_num = log(1+fin_indy_num),
+         invst_save = log(1+invst_save))
+
+df.pca <- princomp(df.numeric.trans[-1], fix_sign = T, cor = T)
 
 pca.dat <- data.frame(numown=df.numeric$numown, df.pca$scores)
 
@@ -244,7 +261,7 @@ model.df %>%
 #### Confusion Matrix for PCA
 
 ```{r}
-expected.vals.pca <- factor(df.numeric$numown)
+expected.vals.pca <- factor(df.numeric.trans$numown)
 predicted.vals.pca <- factor(ifelse(predict(logit.pca.aic) > .7, 1, 0))
 confuse.pca <- confusionMatrix(data = predicted.vals.pca,
                                reference = expected.vals.pca)
