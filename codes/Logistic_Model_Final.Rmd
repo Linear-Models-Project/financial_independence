@@ -56,22 +56,42 @@ df.numeric <- df.2 %>%
            retirement_accts_tax,brokerage_accts_tax, home_value, retire_exp,
            retire_invst_num, fin_indy_num, fin_indy_pct)) %>%
   na.omit()
+
+# rename variables that start with a number
+df.numeric <- df.numeric %>%
+  rename(c(healthcare_exp = '2020_healthcare_exp',
+           housing_exp = '2020_housing_exp',
+           gross_inc = '2020_gross_inc',
+           utilities_exp = '2020_utilities_exp',
+           transp_exp = '2020_transp_exp',
+           lux_exp = '2020_lux_exp',
+           invst_save = '2020_invst_save', 
+           taxes = '2020_taxes'))
+# transform variables with skew by using lot(1+variable) since many had 0s
+df.numeric.trans <- df.numeric %>%
+  mutate(retire_invst_num = log(1+retire_invst_num),
+         healthcare_exp = log(1+healthcare_exp),
+         housing_exp = log(1+housing_exp),
+         fin_indy_num = log(1+fin_indy_num),
+         invst_save = log(1+invst_save))
 ```
+
+
 
 ## The Model
 
 ```{r build model}
 suppressWarnings({
 # create princomp of remaining numeric variables
-df.pca <- princomp(df.numeric[-1], fix_sign = T, cor = T)
+df.pca <- princomp(df.numeric.trans[-1], fix_sign = T, cor = T)
 # create dataframe with princomp scores and response variable
-pca.dat <- data.frame(numown=df.numeric$numown, df.pca$scores)
+pca.dat <- data.frame(numown=df.numeric.trans$numown, df.pca$scores)
 # build logistic model will ~all~ components
 logit.pca <- glm(numown~., data = pca.dat, family = binomial)
 # use stepAIC to trim model
-logit.pca.aic <- stepAIC(logit.pca, direction = 'both', trace = F, method = 'glm')
+logit.final <- stepAIC(logit.pca, direction = 'both', trace = F, method = 'glm')
 # summary of best model as determined by stepAIC
-summary(logit.pca.aic)
+summary(logit.final)
 })
 ```
 
@@ -81,13 +101,13 @@ Checking true values vs predicted, using a threshold of .7. Calculated residuals
 
 ```{r make predictions for each observation}
 # predictions
-y_hat<- round(predict(logit.pca.aic, type = 'response'), 3)
+y_hat<- round(predict(logit.final, type = 'response'), 3)
 # rounded predictions
 y_hat_rounded <- ifelse(y_hat > .70, 1, 0)
 # actual values
 y <- pca.dat$numown
 # residuals
-resids <- round(residuals(logit.pca.aic, type = 'response'), 3)
+resids <- round(residuals(logit.final, type = 'response'), 3)
 # bind columns together
 model.eval<- data.frame(cbind(y, y_hat_rounded, y_hat, resids))
 model.eval[50:100,]
@@ -111,7 +131,7 @@ model.eval %>%
 Centered near 0, 2nd and 3rd quantiles have similar magnitude, some negative skew for lower values.
 
 ```{r residual quantiles}
-quantile(residuals(logit.pca.aic))
+quantile(residuals(logit.final))
 ```
 
 
@@ -120,8 +140,8 @@ quantile(residuals(logit.pca.aic))
 Using a threshold of .7, we still have 94.33% accuracy. 95% confidence interval of (0.9208, 0.9609).
 
 ```{r confusion matrix}
-expected.vals.pca <- factor(df.numeric$numown)
-predicted.vals.pca <- factor(ifelse(predict(logit.pca.aic) > .7, 1, 0))
+expected.vals.pca <- factor(df.numeric.trans$numown)
+predicted.vals.pca <- factor(ifelse(predict(logit.final) > .7, 1, 0))
 confuse.pca <- confusionMatrix(data = predicted.vals.pca,
                                reference = expected.vals.pca)
 confuse.pca
@@ -169,7 +189,7 @@ Most of the components have a linear relationship with the log odds, but there a
 
 ```{r log odds}
 # create vector of log-odds
-probabilities <- predict(logit.pca.aic, type = 'response')
+probabilities <- predict(logit.final, type = 'response')
 logit = log(probabilities/(1-probabilities))
 # combine log-odds with pca components
 pca.dat.assumptions <- cbind(pca.dat, logit)
@@ -189,7 +209,7 @@ model.df %>%
 No multicollinearity, although this is expected because of PCA.
 
 ```{r multicollinearity}
-vif(logit.pca.aic)
+vif(logit.final)
 ```
 
 
