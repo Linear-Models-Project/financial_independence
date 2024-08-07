@@ -135,6 +135,43 @@ logit.pca.aic <- stepAIC(logit.pca, direction = 'both', trace = F, method = 'glm
 summary(logit.pca.aic)
 ```
 
+### Model Assumptions
+
+```{r}
+df.numeric <- df.numeric %>%
+  rename(c(healthcare_exp = '2020_healthcare_exp',
+           housing_exp = '2020_housing_exp',
+           gross_inc = '2020_gross_inc',
+           utilities_exp = '2020_utilities_exp',
+           transp_exp = '2020_transp_exp',
+           lux_exp = '2020_lux_exp',
+           invst_save = '2020_invst_save', 
+           taxes = '2020_taxes'))
+
+df.numeric.trans <- df.numeric %>%
+  mutate(retire_invst_num = log(1+retire_invst_num),
+         healthcare_exp = log(1+healthcare_exp),
+         housing_exp = log(1+housing_exp),
+         fin_indy_num = log(1+fin_indy_num),
+         invst_save = log(1+invst_save))
+
+
+probabilities <- predict(logit.pca.aic, type = 'response')
+logit = log(probabilities/(1-probabilities))
+
+pca.dat <- cbind(pca.dat, logit)
+
+model.df <- gather(pca.dat, key = 'predictor', value = 'value', -c(logit, numown))
+
+model.df %>%
+  ggplot() +
+  aes(x=value, y=logit) +
+  geom_jitter() +
+  facet_wrap(predictor~., scale = 'free') +
+  geom_smooth(method = 'glm')
+```
+
+
 ```{r}
 # predictions
 y_hat.pca <- round(predict(logit.pca.aic, type = 'response'), 3)
