@@ -135,7 +135,9 @@ roc
 
 
 
-### Check Model Assumptions
+## Check Model Assumptions
+
+### Relationship Between Log Odds and Components
 
 ```{r}
 # create vector of log-odds
@@ -152,6 +154,12 @@ model.df %>%
   geom_jitter() +
   facet_wrap(predictor~., scale = 'free') +
   geom_smooth(method = 'glm', color=autumn[1])
+```
+
+### Multicollinearity
+
+```{r}
+vif(logit.pca.aic)
 ```
 
 
