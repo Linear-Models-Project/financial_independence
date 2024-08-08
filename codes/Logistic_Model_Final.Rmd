@@ -212,4 +212,33 @@ No multicollinearity, although this is expected because of PCA.
 vif(logit.final)
 ```
 
+## Some Plots
+
+### Component 15 vs Probability of Home Ownership
+
+```{r prediction plots}
+ggplot(pca.dat, aes(x = Comp.15, y = numown)) + 
+    geom_point(aes(color = factor(numown)), position = position_jitter(height = 0.03, 
+                                                               width = 0)) +
+    geom_smooth(method = "glm", method.args = list(family="binomial")) +
+    labs(y = "P(Own Home)", 
+         title = "Reddit Finance - Homeownership") +
+    theme_bw() + scale_y_continuous(breaks = seq(0, 1, by = 0.1)) + scale_color_manual(values=autumn)
+```
+
+### Facet Wrap for All Components
+
+It's a bit ugly, but with a better aspect ratio it could be nice.
+
+```{r}
+pca.gather <- gather(pca.dat, key='key', value='value', -numown)
+
+pca.gather %>%
+  ggplot() +
+  aes(x=value, y=numown, color=factor(numown)) +
+  geom_jitter() +
+  facet_wrap(key~., scale = 'free') +
+  geom_smooth(method = 'glm', color=autumn[1]) +
+  scale_color_manual(values = autumn)
+```
 
