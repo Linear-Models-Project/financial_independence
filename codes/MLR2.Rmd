@@ -5,7 +5,7 @@ date: "2024-08-05"
 output: html_document
 ---
 
-### MLR 1: Can we predict the Amount of Investment required at retirement based on the Lifestyle one leads?
+### MLR 2: Can we predict the Amount of Investment required at retirement based on the Lifestyle one leads?
 
 #### Importing Required Libraries
 
@@ -14,6 +14,7 @@ library(tidyverse)
 library(MASS)
 library(broom)
 library("ggpubr")
+library(caret)
 ```
 
 #### Reading the Data
@@ -37,6 +38,7 @@ fin_df <- filter(fin_df,
                  coalesce(retire_invst_num,0)>1000 & 
                  coalesce(retire_invst_num,0)<10000000)
 
+fin_df <- fin_df %>% mutate(retire_invst_num_raw = (retire_invst_num))
 fin_df <- fin_df %>% mutate(retire_invst_num = (retire_invst_num)**(0.5))
 
 # Cleaning the Fin Indy Amount for both pops
@@ -49,21 +51,37 @@ fin_df <- fin_df %>%
                                        mean(fin_indy_inst_amount),
                                        fin_indy_inst_amount))
 
+fin_df <- filter(fin_df, fin_indy_inst_amount<5000000)
 
-fin_df %>% ggplot(aes(x = retire_invst_num)) + geom_histogram()
+
+fin_df %>% ggplot(aes(x = retire_invst_num_raw, y= fin_indy_inst_amount)) + geom_jitter()
 
 
-ggqqplot(fin_df$retire_invst_num)
+ggqqplot(fin_df$retire_invst_num) + ggtitle("Normality of Response Variable - retire_invst_num")
 ```
+
+```{r}
+fin_df <- mutate(fin_df, own.the.house = as.factor(ifelse(housing == "Own", "Yes","No")))
+summary(fin_df$homer)
+# gather(dplyr::select(fin_df,c(retire_invst_num,fin_indy_inst_amount,homer)), key = "predictor", value = "value", -homer)  %>% 
+#   ggplot(aes(x = value, color=homer, fill=homer))  + facet_wrap(predictor ~ ., scale = "free") + geom_density()
+
+# dplyr::filter(fin_df, homer == 0) %>% ggplot(aes(x = retire_invst_num, y= fin_indy_inst_amount,color = homer)) + geom_jitter()
+fin_df %>% ggplot(aes(x = retire_invst_num_raw, y= fin_indy_inst_amount,color = own.the.house)) + geom_jitter() + geom_smooth(method = "glm") + ggtitle("Relationship between FI v RE & classification on owning of home") +ylab("FI Number") + xlab("RE Number")
+
+```
+
 
 #### Major Transformations
 
 ```{r}
+
 ### BASIC TRANSFORMATIONS
-model_df <- fin_df %>% mutate(
+fin_df <- fin_df %>% mutate(
   tgt_sf_wthdrw_rt = coalesce(as.numeric(tgt_sf_wthdrw_rt),7.5),
   tgt_sf_wthdrw_rt = ifelse(tgt_sf_wthdrw_rt < 15, tgt_sf_wthdrw_rt, NA),
   tgt_sf_wthdrw_rt = coalesce(tgt_sf_wthdrw_rt, mean(tgt_sf_wthdrw_rt)),
+  tgt_sf_wthdrw_rt = coalesce(as.numeric(tgt_sf_wthdrw_rt),7.5),
   
   retire_exp = coalesce(as.numeric(retire_exp),0),
   retire_exp = ifelse(retire_exp==0, mean(retire_exp), retire_exp),
@@ -113,13 +131,15 @@ model_df <- fin_df %>% mutate(
   Y2020_taxes = coalesce(Y2020_taxes,0),
   Y2020_edu_exp = coalesce(Y2020_edu_exp,0),
   Y2020_other_exp = coalesce(Y2020_other_exp,0),
+  other_debt = coalesce(other_debt,0),
+  mortgage = coalesce(mortgage, 0)
 
   
 )
 
 
 
-model_df <- model_df %>% mutate(
+fin_df <- fin_df %>% mutate(
   fin_indy_inst_amount = (fin_indy_inst_amount)**(1/2),
   tgt_sf_wthdrw_val =tgt_sf_wthdrw_val**0.5,
   retire_exp = retire_exp**0.5,
@@ -138,10 +158,10 @@ model_df <- model_df %>% mutate(
   
   )
 
-model_df = dplyr::select(model_df, c(retire_invst_num,
+model_df = dplyr::select(fin_df, c(retire_invst_num,
                               
     fin_indy_inst_amount,
-    tgt_sf_wthdrw_val,
+    # tgt_sf_wthdrw_val,
     tgt_sf_wthdrw_rt,
     retire_exp,
     home_value,
@@ -157,7 +177,7 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
     credit_personal_loan,
     medical_debt,
     other_debt,
-    mortgage, 
+    mortgage,
     fin_indy_pct,
     
 
@@ -176,26 +196,34 @@ model_df = dplyr::select(model_df, c(retire_invst_num,
     Y2020_taxes,
     Y2020_edu_exp,
     Y2020_other_exp,
-
+    
+    
+    children,
+    edu,
+    stp_whn_fin_indy
 )
     
   
 )
+# dplyr::select(model_df,names(fin_df)[sapply(fin_df, is.numeric)])
+# model_df2 <- gather(dplyr::select(model_df,names(fin_df)[sapply(fin_df, is.numeric)]), key = "predictor", value = "value", -retire_invst_num)
 
-model_df2 <- gather(model_df, key = "predictor", value = "value", -retire_invst_num)
-
-
-model_df2 %>%
-  ggplot(
-    aes(y = retire_invst_num, x = value)
-  ) + 
-  geom_jitter() + 
-  facet_wrap(predictor ~ ., scale = "free") + 
-  geom_smooth(method = "lm")
-
+# 
+# model_df2 %>%
+#   ggplot(
+#     aes(y = retire_invst_num, x = value)
+#   ) + 
+#   geom_jitter() + 
+#   facet_wrap(predictor ~ ., scale = "free") + 
+#   geom_smooth(method = "lm")
+# 
+# 
+# blank <- apply(is.na(model_df), 1, any)
+# blanks = model_df[blank, ]
+# 
 model_df <- na.omit(model_df)
-cor1 = cor(model_df)
-cor1
+# cor1 = cor(model_df)
+# cor1
 ```
 
 ```{r}
@@ -214,53 +242,74 @@ bmvif <- car::vif(base_model)
 bmvif
 ```
 
-#### OUTLIER REMOVAL
-
-```{r}
-bm_diag <- base_model %>%
-  augment(data = model_df) 
-bm_diag
-
-
-
-outliers = filter(bm_diag, abs(.std.resid)>=3)
-model_df_2 = filter(bm_diag, abs(.std.resid)<3)
-model_df_2 = filter(model_df_2, abs(.hat)<3)
-model_df_2 = dplyr::select(model_df_2, -starts_with("."))
-model_df_2
-```
-
-#### Re-Run Base OLS Model
-
-```{r}
-base_model2 <- lm(retire_invst_num~., model_df_2)
-bmsumm2 = summary(base_model2)
-bmsumm2
-
-
-bmvif2 <- car::vif(base_model2)
-bmvif2
-```
-
 #### AKAKI INFORMATION CRITERIA
 
 ```{r}
-aic_model <- MASS::stepAIC(base_model2, direction = "both", trace = F) 
+aic_model <- MASS::stepAIC(base_model, direction = "both", trace = F) 
 summary(aic_model)
 ```
+
+#### OUTLIER REMOVAL
+
+```{r}
+bm_diag <- aic_model %>%   augment(data = model_df)  
+bm_diag    
+outliers = filter(bm_diag, abs(.std.resid)>=3) 
+
+model_df_2 = filter(bm_diag, abs(.std.resid)<3) 
+# model_df_2 = filter(model_df_2, abs(.hat)<3) 
+model_df_2 = dplyr::select(model_df_2, -starts_with(".")) 
+model_df_2
+```
+
+#### Re-Run Base AKAKI Model
+
+```{r}
+base_model2 <- MASS::stepAIC(lm(retire_invst_num~., model_df_2) , direction = "both", trace = F) 
+bmsumm2 = summary(base_model2) 
+bmsumm2   
+bmvif2 <- car::vif(base_model2) 
+# bmvif2
+```
+
+#### 
 
 #### Removing High p-value Features
 
 ```{r}
 low_lm <- lm(retire_invst_num ~ .
-             -Y2020_transp_exp -Y2020_necessities_exp -Y2020_invst_save    
-             -fin_indy_pct -home_value -tgt_sf_wthdrw_val
+              -Y2020_lux_exp      -Y2020_child_exp                                                                                                      # -Y2020_necessities_exp -Y2020_invst_save
+             # -fin_indy_pct -home_value -tgt_sf_wthdrw_val
              ,data = model_df_2)
 summary(low_lm)
 aic_model <- MASS::stepAIC(low_lm, direction = "both", trace = F) 
-summary(aic_model)
+aic_summary <- summary(aic_model)
 data.frame(car::vif(aic_model))
 ```
+
+```{r}
+aic_summary
+```
+
+#### Regularization Attempt
+
+```{r}
+library(glmnet)
+X = model.matrix(retire_invst_num~0+., data = model_df_2)
+y = model_df_2$retire_invst_num
+
+rmodel <- glmnet(x=X, y=y, alpha = 1)
+plot(rmodel, label = T, xvar = "lambda")
+```
+
+```{r}
+kfcvglmnet <- cv.glmnet(x=X, y=y, alpha=1, nfolds=3)
+plot(kfcvglmnet, label = T, xvar = "lambda")
+kfcvglmnet$lambda.min
+```
+
+
+
 
 #### Final Selected Model
 
@@ -295,27 +344,61 @@ final_model_df = na.omit(dplyr::select(model_df_2, retire_invst_num,
 
 
 
+# fin_indy_inst_amount ,
+# tgt_sf_wthdrw_rt ,
+# retire_exp ,
+# brokerage_accts_tax ,
+# retirement_accts_tax ,
+# cash ,
+# auto_loan ,
+# medical_debt ,
+# other_debt ,
+# mortgage ,
+# Y2020_housing_exp ,
+# Y2020_utilities_exp ,
+# Y2020_lux_exp ,
+# Y2020_healthcare_exp ,
+# Y2020_taxes ,
+# Y2020_edu_exp ,
+# children,
+# stp_whn_fin_indy,
+
+
+# fin_indy_inst_amount ,
+# tgt_sf_wthdrw_val ,
+# tgt_sf_wthdrw_rt ,
+# home_value ,
+# brokerage_accts_tax ,
+# cash ,
+# invst_prop_bus_own ,
+# other_debt ,
+# Y2020_gross_inc ,
+# Y2020_transp_exp ,
+# Y2020_child_exp ,
+# Y2020_taxes ,
+# Y2020_edu_exp ,
+# children,
+# stp_whn_fin_indy
+
+
+
+
+
 fin_indy_inst_amount ,
 tgt_sf_wthdrw_rt ,
 retire_exp ,
+home_value ,
 brokerage_accts_tax ,
-retirement_accts_tax ,
 cash ,
-auto_loan ,
-medical_debt ,
+invst_prop_bus_own ,
 other_debt ,
-mortgage ,
-Y2020_housing_exp ,
-Y2020_utilities_exp ,
-Y2020_lux_exp ,
-Y2020_healthcare_exp ,
+Y2020_gross_inc ,
+Y2020_transp_exp ,
+Y2020_invst_save ,
 Y2020_taxes ,
 Y2020_edu_exp ,
-
-
-
-                                
-                          
+children,
+stp_whn_fin_indy
 
 ))
 
@@ -324,37 +407,79 @@ summary(final_model)
 diagnostics <- augment(final_model, data = na.omit(final_model_df))
 diagnostics %>% ggplot(aes(x = .fitted,y = .resid)) + geom_jitter()
 ```
+```{r}
+summary(final_model)
+```
 
 #### Residual Analysis
 
 ```{r}
 diagnostics <- augment(final_model, data = na.omit(final_model_df))
-diagnostics %>% ggplot(aes(x = .fitted,y = .resid)) + geom_jitter()
+ggqqplot(diagnostics$.resid)
 ```
 
 ```{r}
 data.frame(car::vif(final_model))
 ```
 
-#### Regularization Attempt
 
 ```{r}
-library(glmnet)
-X = model.matrix(retire_invst_num~0+., data = model_df_2)
-y = model_df_2$retire_invst_num
+library(ggcorrplot)
 
-rmodel <- glmnet(x=X, y=y, alpha = 1)
-plot(rmodel, label = T, xvar = "lambda")
+cor(dplyr::select(final_model_df,-c(children, stp_whn_fin_indy)))
+ggcorrplot(cor(dplyr::select(final_model_df,-c(children, stp_whn_fin_indy))),
+           type = "upper", lab = T
+           ) + ggtitle("Correlation between major numeric predictors in MLR")
 ```
 
 ```{r}
-kfcvglmnet <- cv.glmnet(x=X, y=y, alpha=1, nfolds=3)
-plot(kfcvglmnet, label = T, xvar = "lambda")
+
+model_df2 <- gather(dplyr::select(final_model_df,-c(children,stp_whn_fin_indy)), key = "predictor", value = "value", -retire_invst_num)
+
+
+model_df2 %>%
+  ggplot(
+    aes(y = retire_invst_num, x = value)
+  ) +
+  geom_jitter() +
+  facet_wrap(predictor ~ ., scale = "free") +
+  geom_smooth(method = "lm")
 ```
 
 ```{r}
-X = model.matrix(retire_invst_num~0+., data = model_df)
-y = model_df$retire_invst_num
-rmodel <- glmnet(x=X, y=y, alpha = 1)
-plot(rmodel, label = T, xvar = "lambda")
+means <- sapply(final_model_df, mean, na.rm = TRUE)
+ 
+# Brennan Example
+user_inputs <- list(
+  fin_indy_inst_amount = sqrt(3100000),
+  student_loans = sqrt(25000),
+  tgt_sf_wthdrw_rt = 3.00,
+  spec_crypto = 80000,
+  stp_whn_fin_indy = "Yes",
+  children = "Do not have children, but intend to"
+)
+
+new_data <- data.frame(matrix(ncol = length(names(means)), nrow = 1))
+colnames(new_data) <- names(means)
+
+for (var in names(user_inputs)) {
+  new_data[[var]] <- user_inputs[[var]]
+}
+
+for (var in setdiff(names(means), names(user_inputs))) {
+  new_data[[var]] <- means[[var]]
+}
+
+prediction <- predict(final_model, newdata = new_data, interval = 'prediction')
+print((prediction)**2)
 ```
+#### CROSS VALIDATION 
+
+```{r}
+control <- trainControl(method = "repeatedcv", number = 7, repeats = 10)
+model2 <- train(retire_invst_num~., method = "lm", trControl = control, data = final_model_df)
+summary(model2)
+model2$results$RMSE
+```
+
+
